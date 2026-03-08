@@ -34,26 +34,9 @@ fn test_sentinel_server_has_domain_tools() {
     let tools = server.list_tool_definitions();
     let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
 
-    // Social Value
-    assert!(names.contains(&"list_toms_themes"), "Missing list_toms_themes");
-    assert!(names.contains(&"search_toms"), "Missing search_toms");
-    assert!(names.contains(&"calculate_social_value"), "Missing calculate_social_value");
-
-    // Bid Writing
-    assert!(names.contains(&"list_frameworks"), "Missing list_frameworks");
-    assert!(names.contains(&"bid_no_bid_analysis"), "Missing bid_no_bid_analysis");
-    assert!(names.contains(&"score_proposal"), "Missing score_proposal");
-
-    // Tender
-    assert!(names.contains(&"parse_tender"), "Missing parse_tender");
-    assert!(names.contains(&"check_compliance"), "Missing check_compliance");
-
     // QA
     assert!(names.contains(&"qa_check_fonts"), "Missing qa_check_fonts");
     assert!(names.contains(&"qa_full_check"), "Missing qa_full_check");
-
-    // Search
-    assert!(names.contains(&"search_tenders"), "Missing search_tenders");
 
     // Lineage
     assert!(names.contains(&"lineage_record"), "Missing lineage_record");
@@ -74,11 +57,10 @@ fn test_sentinel_server_has_domain_tools() {
 fn test_sentinel_server_tool_count() {
     let (_dir, server) = setup();
     let tools = server.list_tool_definitions();
-    // 2 sentinel + 7 social value + 14 bid + 5 tender + 8 qa + 1 search
-    // + 3 lineage + 4 enforcer + 3 memory + 2 pattern = 49
+    // 2 sentinel + 8 qa + 3 lineage + 4 enforcer + 3 memory + 2 pattern + eyes
     assert!(
-        tools.len() >= 40,
-        "Expected at least 40 tools, found: {}",
+        tools.len() >= 15,
+        "Expected at least 15 tools, found: {}",
         tools.len()
     );
 }
@@ -121,8 +103,8 @@ fn test_status_includes_tool_count() {
     );
 
     assert!(
-        expected_count >= 40,
-        "Expected at least 40 tools, found {}",
+        expected_count >= 15,
+        "Expected at least 15 tools, found {}",
         expected_count
     );
 }

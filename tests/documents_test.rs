@@ -1,4 +1,4 @@
-use sentinel::sentinel_core::documents::{DocumentService, ParsedDocument};
+use opencheir::store::documents::{DocumentService, ParsedDocument};
 
 // ---------------------------------------------------------------------------
 // Test helper: build a DOCX in memory and parse it via DocumentService

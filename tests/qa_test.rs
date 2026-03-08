@@ -1,5 +1,5 @@
-use sentinel::domain::qa::QaService;
-use sentinel::sentinel_core::documents::{DocumentService, ParsedDocument};
+use opencheir::domain::qa::QaService;
+use opencheir::store::documents::{DocumentService, ParsedDocument};
 
 // ---------------------------------------------------------------------------
 // Test helper: build a DOCX in memory and parse it via DocumentService
@@ -304,114 +304,6 @@ fn test_check_word_count_limit_pattern_variations() {
 }
 
 // ===========================================================================
-// Tests: check_sensitive_info
-// ===========================================================================
-
-#[test]
-fn test_check_sensitive_info_found() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new()
-            .add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text("Our contact is john@example.com")),
-            )
-            .add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text("Call us at 07700900123")),
-            ),
-    );
-
-    let sensitive = vec![
-        ("email".to_string(), "john@example.com".to_string()),
-        ("phone".to_string(), "07700900123".to_string()),
-    ];
-
-    let result = QaService::check_sensitive_info(&doc, &sensitive);
-    assert_eq!(result.check_type, "sensitive_info");
-    assert_eq!(result.status, "fail");
-    assert_eq!(result.issue_count, 2);
-    assert!(result.issues.iter().all(|i| i.severity == "critical"));
-}
-
-#[test]
-fn test_check_sensitive_info_clean() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new().add_paragraph(
-            Paragraph::new()
-                .add_run(Run::new().add_text("This is a clean document with no secrets")),
-        ),
-    );
-
-    let sensitive = vec![
-        ("email".to_string(), "secret@hidden.com".to_string()),
-        ("password".to_string(), "hunter2".to_string()),
-    ];
-
-    let result = QaService::check_sensitive_info(&doc, &sensitive);
-    assert_eq!(result.status, "pass");
-    assert_eq!(result.issue_count, 0);
-}
-
-#[test]
-fn test_check_sensitive_info_in_table() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new().add_table(docx_rs::Table::new(vec![TableRow::new(vec![
-            TableCell::new().add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text("Secret value ABC123 in a cell")),
-            ),
-        ])])),
-    );
-
-    let sensitive = vec![("code".to_string(), "ABC123".to_string())];
-
-    let result = QaService::check_sensitive_info(&doc, &sensitive);
-    assert_eq!(result.status, "fail");
-    assert_eq!(result.issue_count, 1);
-}
-
-#[test]
-fn test_check_sensitive_info_case_insensitive() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new().add_paragraph(
-            Paragraph::new()
-                .add_run(Run::new().add_text("Contains SECRET VALUE here")),
-        ),
-    );
-
-    let sensitive = vec![("test".to_string(), "secret value".to_string())];
-
-    let result = QaService::check_sensitive_info(&doc, &sensitive);
-    assert_eq!(result.status, "fail");
-    assert_eq!(result.issue_count, 1);
-}
-
-#[test]
-fn test_check_sensitive_info_empty_value_ignored() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new().add_paragraph(
-            Paragraph::new().add_run(Run::new().add_text("Some text")),
-        ),
-    );
-
-    let sensitive = vec![("empty".to_string(), "".to_string())];
-
-    let result = QaService::check_sensitive_info(&doc, &sensitive);
-    assert_eq!(result.status, "pass");
-    assert_eq!(result.issue_count, 0);
-}
-
-// ===========================================================================
 // Tests: check_signatures
 // ===========================================================================
 
@@ -474,109 +366,6 @@ fn test_check_signatures_no_signature_fields() {
     let result = QaService::check_signatures(&doc);
     assert_eq!(result.status, "pass");
     assert!(result.issues.is_empty());
-}
-
-// ===========================================================================
-// Tests: check_filenames
-// ===========================================================================
-
-#[test]
-fn test_check_filenames_valid() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-
-    // Create files with valid names
-    std::fs::write(dir.path().join("proposal-v1.docx"), b"").unwrap();
-    std::fs::write(dir.path().join("appendix_A.pdf"), b"").unwrap();
-    std::fs::write(dir.path().join("pricing.xlsx"), b"").unwrap();
-
-    let result = QaService::check_filenames(dir_path);
-    assert_eq!(result.check_type, "filenames");
-    assert_eq!(result.status, "pass");
-    assert_eq!(result.issue_count, 0);
-}
-
-#[test]
-fn test_check_filenames_with_spaces() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-
-    std::fs::write(dir.path().join("my document.docx"), b"").unwrap();
-    std::fs::write(dir.path().join("valid-name.pdf"), b"").unwrap();
-
-    let result = QaService::check_filenames(dir_path);
-    assert_eq!(result.status, "warning");
-    assert!(result.issue_count >= 1);
-
-    let space_issue = result
-        .issues
-        .iter()
-        .find(|i| i.issue_type == "filename_spaces");
-    assert!(space_issue.is_some(), "Should flag filename with spaces");
-}
-
-#[test]
-fn test_check_filenames_too_long() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-
-    // Create a filename that exceeds 80 characters
-    let long_name = format!("{}.docx", "a".repeat(80));
-    std::fs::write(dir.path().join(&long_name), b"").unwrap();
-
-    let result = QaService::check_filenames(dir_path);
-    assert!(result.issue_count >= 1);
-
-    let length_issue = result
-        .issues
-        .iter()
-        .find(|i| i.issue_type == "filename_too_long");
-    assert!(length_issue.is_some(), "Should flag overly long filename");
-}
-
-#[test]
-fn test_check_filenames_no_extension() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-
-    std::fs::write(dir.path().join("README"), b"").unwrap();
-
-    let result = QaService::check_filenames(dir_path);
-    assert!(result.issue_count >= 1);
-
-    let ext_issue = result
-        .issues
-        .iter()
-        .find(|i| i.issue_type == "filename_no_extension");
-    assert!(ext_issue.is_some(), "Should flag file without extension");
-}
-
-#[test]
-fn test_check_filenames_nonexistent_folder() {
-    let result = QaService::check_filenames("/nonexistent/path/to/folder");
-    assert_eq!(result.status, "fail");
-    assert_eq!(result.issue_count, 1);
-    assert_eq!(result.issues[0].issue_type, "invalid_folder");
-}
-
-#[test]
-fn test_check_filenames_special_characters() {
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-
-    std::fs::write(dir.path().join("file@name.docx"), b"").unwrap();
-
-    let result = QaService::check_filenames(dir_path);
-    assert!(result.issue_count >= 1);
-
-    let special_issue = result
-        .issues
-        .iter()
-        .find(|i| i.issue_type == "filename_special_chars");
-    assert!(
-        special_issue.is_some(),
-        "Should flag filename with special characters"
-    );
 }
 
 // ===========================================================================
@@ -647,13 +436,12 @@ fn test_full_check_clean_document() {
             ),
     );
 
-    let sensitive: Vec<(String, String)> = vec![];
-    let result = QaService::full_check(&doc, None, &sensitive);
+    let result = QaService::full_check(&doc);
 
     assert!(result.critical_count == 0);
     assert!(result.ready_to_submit);
-    // Should have checks for: fonts, dashes, smart_quotes, word_counts, sensitive_info, signatures
-    assert!(result.checks.len() >= 6);
+    // Should have checks for: fonts, dashes, smart_quotes, word_counts, signatures
+    assert!(result.checks.len() >= 5);
 }
 
 #[test]
@@ -664,48 +452,13 @@ fn test_full_check_with_issues() {
         Docx::new()
             .add_paragraph(
                 Paragraph::new()
-                    .add_run(Run::new().add_text("Contains secret password123 here")),
-            )
-            .add_paragraph(
-                Paragraph::new()
                     .add_run(Run::new().add_text("Em dash \u{2014} present")),
             ),
     );
 
-    let sensitive = vec![("password".to_string(), "password123".to_string())];
-    let result = QaService::full_check(&doc, None, &sensitive);
+    let result = QaService::full_check(&doc);
 
     assert!(result.total_issues > 0);
-    assert!(result.critical_count > 0);
-    assert!(!result.ready_to_submit);
-}
-
-#[test]
-fn test_full_check_with_folder() {
-    use docx_rs::*;
-
-    let doc = build_and_parse(
-        Docx::new().add_paragraph(
-            Paragraph::new().add_run(Run::new().add_text("Simple doc")),
-        ),
-    );
-
-    let dir = tempfile::tempdir().unwrap();
-    let dir_path = dir.path().to_str().unwrap();
-    std::fs::write(dir.path().join("valid-file.docx"), b"").unwrap();
-
-    let sensitive: Vec<(String, String)> = vec![];
-    let result = QaService::full_check(&doc, Some(dir_path), &sensitive);
-
-    // Should include the filenames check
-    let filename_check = result
-        .checks
-        .iter()
-        .find(|c| c.check_type == "filenames");
-    assert!(
-        filename_check.is_some(),
-        "Full check with folder should include filenames check"
-    );
 }
 
 #[test]
@@ -738,8 +491,7 @@ fn test_full_check_aggregates_correctly() {
             ])])),
     );
 
-    let sensitive: Vec<(String, String)> = vec![];
-    let result = QaService::full_check(&doc, None, &sensitive);
+    let result = QaService::full_check(&doc);
 
     // Font inconsistency (warning) + unsigned signature (critical)
     assert!(result.total_issues >= 2);

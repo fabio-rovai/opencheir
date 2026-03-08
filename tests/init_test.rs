@@ -1,4 +1,4 @@
-use sentinel::config::expand_tilde;
+use opencheir::config::expand_tilde;
 
 #[test]
 fn test_expand_tilde() {

@@ -1,4 +1,4 @@
-use sentinel::domain::eyes::EyesService;
+use opencheir::domain::eyes::EyesService;
 use tempfile::TempDir;
 
 // ===========================================================================
@@ -288,5 +288,5 @@ fn test_resize_image_invalid_data() {
 #[test]
 fn test_eyes_router_builds() {
     // Verify the router can be constructed without panic
-    let _router = sentinel::domain::eyes::eyes_router();
+    let _router = opencheir::domain::eyes::eyes_router();
 }

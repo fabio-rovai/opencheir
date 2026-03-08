@@ -4,7 +4,7 @@ use axum::extract::{Path, Query, State};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 
 // ---------------------------------------------------------------------------
 // Data structures

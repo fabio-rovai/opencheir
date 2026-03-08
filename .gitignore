@@ -1,5 +1,5 @@
 /target
-sentinel.db
+opencheir.db
 *.db-shm
 *.db-wal
 data/company.json

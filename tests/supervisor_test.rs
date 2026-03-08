@@ -1,6 +1,6 @@
-use sentinel::orchestration::supervisor::{ExternalProcess, RestartTracker, Supervisor};
+use opencheir::orchestration::supervisor::{ExternalProcess, RestartTracker, Supervisor};
 use std::collections::HashMap;
-use sentinel::config::ExternalServerConfig;
+use opencheir::config::ExternalServerConfig;
 
 #[tokio::test]
 async fn test_spawn_process() {
@@ -210,7 +210,7 @@ async fn test_health_check_multiple_processes() {
 #[tokio::test]
 async fn test_record_health_in_db() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(tmp.path()).unwrap();
+    let db = opencheir::store::state::StateDb::open(tmp.path()).unwrap();
 
     db.record_health("mcp-server-1", "process", "healthy", None)
         .unwrap();
@@ -225,7 +225,7 @@ async fn test_record_health_in_db() {
 #[tokio::test]
 async fn test_record_health_with_error() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(tmp.path()).unwrap();
+    let db = opencheir::store::state::StateDb::open(tmp.path()).unwrap();
 
     db.record_health("mcp-server-2", "process", "down", Some("process exited"))
         .unwrap();
@@ -238,7 +238,7 @@ async fn test_record_health_with_error() {
 #[tokio::test]
 async fn test_record_health_upsert() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(tmp.path()).unwrap();
+    let db = opencheir::store::state::StateDb::open(tmp.path()).unwrap();
 
     // Insert initial healthy status.
     db.record_health("srv", "process", "healthy", None).unwrap();
@@ -256,7 +256,7 @@ async fn test_record_health_upsert() {
 #[tokio::test]
 async fn test_increment_restart_count() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(tmp.path()).unwrap();
+    let db = opencheir::store::state::StateDb::open(tmp.path()).unwrap();
 
     db.record_health("srv", "process", "restarting", None)
         .unwrap();

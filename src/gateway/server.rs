@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::orchestration::enforcer::{Action, Enforcer};
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 
 // ─── MCP tool input structs ─────────────────────────────────────────────────
 
@@ -161,7 +161,7 @@ impl OpenCheirServer {
             "version": env!("CARGO_PKG_VERSION"),
             "modules": {
                 "gateway": "active",
-                "sentinel_core": "active",
+                "store": "active",
                 "domain": "active",
                 "orchestration": "active"
             },
@@ -196,7 +196,7 @@ impl OpenCheirServer {
 
     #[tool(name = "qa_check_fonts", description = "Check for font consistency issues in a DOCX document")]
     async fn qa_check_fonts(&self, Parameters(input): Parameters<DocPathInput>) -> String {
-        use crate::sentinel_core::documents::DocumentService;
+        use crate::store::documents::DocumentService;
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => serde_json::to_string(&QaService::check_fonts(&doc)).unwrap_or_default(),
@@ -206,7 +206,7 @@ impl OpenCheirServer {
 
     #[tool(name = "qa_check_dashes", description = "Check for dash/hyphen inconsistencies in a DOCX document")]
     async fn qa_check_dashes(&self, Parameters(input): Parameters<DocPathInput>) -> String {
-        use crate::sentinel_core::documents::DocumentService;
+        use crate::store::documents::DocumentService;
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => serde_json::to_string(&QaService::check_dashes(&doc)).unwrap_or_default(),
@@ -216,7 +216,7 @@ impl OpenCheirServer {
 
     #[tool(name = "qa_check_word_counts", description = "Check word counts against limits in a DOCX document")]
     async fn qa_check_word_counts(&self, Parameters(input): Parameters<DocPathInput>) -> String {
-        use crate::sentinel_core::documents::DocumentService;
+        use crate::store::documents::DocumentService;
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => serde_json::to_string(&QaService::check_word_counts(&doc)).unwrap_or_default(),
@@ -226,7 +226,7 @@ impl OpenCheirServer {
 
     #[tool(name = "qa_check_signatures", description = "Check for signature placeholders in a DOCX document")]
     async fn qa_check_signatures(&self, Parameters(input): Parameters<DocPathInput>) -> String {
-        use crate::sentinel_core::documents::DocumentService;
+        use crate::store::documents::DocumentService;
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => serde_json::to_string(&QaService::check_signatures(&doc)).unwrap_or_default(),
@@ -236,7 +236,7 @@ impl OpenCheirServer {
 
     #[tool(name = "qa_full_check", description = "Run all QA checks on a DOCX document (fonts, dashes, smart quotes, word counts, signatures)")]
     async fn qa_full_check(&self, Parameters(input): Parameters<QaFullCheckInput>) -> String {
-        use crate::sentinel_core::documents::DocumentService;
+        use crate::store::documents::DocumentService;
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => {
@@ -251,7 +251,7 @@ impl OpenCheirServer {
 
     #[tool(name = "search_documents", description = "Full-text search across indexed document content")]
     async fn search_documents(&self, Parameters(input): Parameters<SearchInput>) -> String {
-        use crate::sentinel_core::search::SearchService;
+        use crate::store::search::SearchService;
         match SearchService::search(&self.db, &input.query, input.source.as_deref(), input.limit.unwrap_or(10)) {
             Ok(results) => serde_json::to_string(&results).unwrap_or_default(),
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),

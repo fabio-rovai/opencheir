@@ -1,4 +1,4 @@
-use sentinel::orchestration::skills::*;
+use opencheir::orchestration::skills::*;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;

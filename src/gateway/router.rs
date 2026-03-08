@@ -23,9 +23,9 @@ pub fn route_tool(name: &str) -> &'static str {
     } else if name.starts_with("pattern_") {
         "orchestration::patterns"
     } else if name.starts_with("search_") {
-        "sentinel_core::search"
+        "store::search"
     } else if name.starts_with("doc_") {
-        "sentinel_core::documents"
+        "store::documents"
     } else if name.starts_with("word_") {
         "proxy::word-document-server"
     } else if name.starts_with("mermaid_") {
@@ -53,8 +53,8 @@ mod tests {
         assert_eq!(route_tool("opencheir_status"), "orchestration::supervisor");
         assert_eq!(route_tool("enforcer_check"), "orchestration::enforcer");
         assert_eq!(route_tool("pattern_analyze"), "orchestration::patterns");
-        assert_eq!(route_tool("search_documents"), "sentinel_core::search");
-        assert_eq!(route_tool("doc_parse"), "sentinel_core::documents");
+        assert_eq!(route_tool("search_documents"), "store::search");
+        assert_eq!(route_tool("doc_parse"), "store::documents");
         assert_eq!(route_tool("word_add_paragraph"), "proxy::word-document-server");
         assert_eq!(route_tool("mermaid_render"), "proxy::mermaid-kroki");
         assert_eq!(route_tool("puppeteer_click"), "proxy::puppeteer");

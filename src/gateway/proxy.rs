@@ -72,7 +72,7 @@ pub async fn initialize_mcp(
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {
-                "name": "sentinel",
+                "name": "opencheir",
                 "version": env!("CARGO_PKG_VERSION"),
             }
         }),

@@ -1,5 +1,5 @@
-use sentinel::orchestration::patterns::{Pattern, PatternService};
-use sentinel::sentinel_core::state::StateDb;
+use opencheir::orchestration::patterns::{Pattern, PatternService};
+use opencheir::store::state::StateDb;
 use tempfile::TempDir;
 
 fn setup_db() -> (TempDir, StateDb) {
@@ -143,7 +143,7 @@ fn test_analyze_frequent_blocks() {
                 session_id,
                 "parse_before_write",
                 "block",
-                "tender_write_answer",
+                "write_document_cell",
                 "no parse in history"
             ],
         )
@@ -180,7 +180,7 @@ fn test_analyze_friction_point() {
                 session_id,
                 format!("rule_{}", i % 2), // different rules
                 "block",
-                "tender_write_answer",     // same tool
+                "write_document_cell",     // same tool
                 "some reason"
             ],
         )
@@ -190,13 +190,13 @@ fn test_analyze_friction_point() {
 
     let patterns = PatternService::analyze_enforcement(&db).unwrap();
 
-    // Should find a friction_point pattern for tender_write_answer
+    // Should find a friction_point pattern for write_document_cell
     let friction: Vec<_> = patterns
         .iter()
         .filter(|p| p.category == "friction_point")
         .collect();
     assert_eq!(friction.len(), 1);
-    assert!(friction[0].description.contains("tender_write_answer"));
+    assert!(friction[0].description.contains("write_document_cell"));
     assert_eq!(friction[0].occurrences, 5);
     assert!((friction[0].confidence - 0.7).abs() < f64::EPSILON);
 }

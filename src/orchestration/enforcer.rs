@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use serde::Serialize;
 
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 
 /// The action an enforcer rule produces.
 #[derive(Debug, Clone, Serialize, PartialEq)]

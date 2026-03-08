@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::Result;
 use serde::Serialize;
 
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 
 use super::planner::{Plan, TaskNode};
 use super::spawner::Spawner;

@@ -3,7 +3,7 @@ use rmcp::ServiceExt;
 
 use opencheir::config::expand_tilde;
 use opencheir::gateway::server::OpenCheirServer;
-use opencheir::sentinel_core::state::StateDb;
+use opencheir::store::state::StateDb;
 
 const DEFAULT_CONFIG: &str = r#"[general]
 data_dir = "~/.opencheir"

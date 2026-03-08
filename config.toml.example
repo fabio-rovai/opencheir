@@ -1,16 +1,13 @@
-# Sentinel Configuration
-# Copy this file to ~/.sentinel/config.toml and adjust as needed.
+# OpenCheir Configuration
+# Copy this file to ~/.opencheir/config.toml and adjust as needed.
 # All values shown are the defaults — uncomment and change only what you need.
 
 [general]
-# Base directory for sentinel data (database, skills, etc.)
-# data_dir = "~/.sentinel"
-
-# Root directory where tender projects are stored
-# tenders_root = "~/Desktop/Tenders"
+# Base directory for OpenCheir data (database, skills, etc.)
+# data_dir = "~/.opencheir"
 
 # Directory for shared skill definitions
-# skills_dir = "~/.sentinel/skills"
+# skills_dir = "~/.opencheir/skills"
 
 # Directory for personal/private skill definitions
 # personal_skills_dir = "~/.claude/skills"

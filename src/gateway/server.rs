@@ -240,7 +240,7 @@ impl OpenCheirServer {
         use crate::domain::qa::QaService;
         match DocumentService::parse(&input.path) {
             Ok(doc) => {
-                serde_json::to_string(&QaService::full_check(&doc, None, &[]))
+                serde_json::to_string(&QaService::full_check(&doc))
                     .unwrap_or_default()
             }
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),

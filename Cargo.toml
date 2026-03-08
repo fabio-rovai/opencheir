@@ -1,7 +1,14 @@
 [package]
-name = "sentinel"
+name = "opencheir"
 version = "0.1.0"
 edition = "2024"
+description = "Lightweight, open-source document governance MCP server"
+license = "MIT"
+repository = "https://github.com/FABIOTESS/opencheir"
+
+[[bin]]
+name = "opencheir"
+path = "src/main.rs"
 
 [dependencies]
 # MCP protocol

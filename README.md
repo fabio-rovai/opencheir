@@ -1,144 +1,114 @@
-# Sentinel
+# OpenCheir
 
-A single Rust binary that replaces 12 MCP servers (Python, TypeScript, Go, Node) with one fast, unified MCP server for Claude Code.
+Lightweight, open-source document governance MCP server written in Rust.
 
-## What it does
+OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforcement, audit trails, and multi-agent orchestration as a single MCP binary.
 
-Sentinel consolidates tender writing, bid analysis, QA, social value, search, enforcer rules, lineage tracking, memory, and pattern discovery into **49 MCP tools** served over stdio.
+## Features
 
-### Modules
-
-| Module | Tools | Replaces |
-|--------|-------|----------|
-| Social Value | `list_toms_themes`, `search_toms`, `calculate_social_value`, `suggest_social_value`, `draft_social_value_response`, `get_toms_measure`, `get_toms_by_theme` | `social-value` (Python) |
-| Bid Writing | `list_frameworks`, `get_framework`, `compare_frameworks`, `recommend_framework`, `search_resources`, `score_proposal`, `generate_win_themes`, `generate_compliance_matrix`, `bid_no_bid_analysis`, `generate_executive_summary`, `generate_proposal_outline`, `get_section_template`, `get_industry_guide`, `get_persuasion_technique` | `bid-writing` (Node) |
-| Tender | `parse_tender`, `read_answer`, `check_compliance`, `check_pass_fail_questions`, `check_submission_files` | `tender-orchestrator` (Python) |
-| QA | `qa_check_fonts`, `qa_check_dashes`, `qa_check_word_counts`, `qa_check_sensitive_info`, `qa_check_signatures`, `qa_check_filenames`, `qa_full_check` | `tender-qa` (Python) |
-| Search | `search_tenders` | `tender-rag` (Python) |
-| Lineage | `lineage_record`, `lineage_events`, `lineage_timeline` | `lineage` (Node) |
-| Enforcer | `enforcer_check`, `enforcer_log`, `enforcer_rules`, `enforcer_toggle_rule` | new |
-| Memory | `hive_memory_store`, `hive_memory_recall`, `hive_memory_by_domain` | `hive` (Go) |
-| Patterns | `pattern_analyze`, `pattern_list` | new |
-| Status | `sentinel_status`, `sentinel_health` | new |
+| Module | Tools | Purpose |
+|--------|-------|---------|
+| Document QA | 5 | Font, dash, word count, signature checks |
+| Document Parsing | 2 | DOCX structure extraction |
+| Search | 1 | FTS5 full-text search |
+| Enforcer | 4 | Workflow rule engine |
+| Lineage | 3 | Audit trail & event tracking |
+| Patterns | 2 | Cross-session pattern discovery |
+| Memory | 3 | Persistent learning storage |
+| Hive | - | Multi-agent orchestration |
+| Status | 2 | Health monitoring |
 
 ## Requirements
 
-- Rust 1.80+ (uses `edition = "2024"`)
+- Rust 1.80+
 - macOS or Linux
-
-### Companion MCP Servers
-
-Sentinel handles tender analysis, QA, bid writing, and orchestration — but it does **not** write DOCX files, automate browsers, or render diagrams. You need these MCP servers alongside Sentinel:
-
-| Server | Purpose | Why Sentinel needs it |
-|--------|---------|----------------------|
-| `word-document-server` | Create and edit Word documents | Sentinel reads DOCX for QA/parsing but cannot write them |
-| `puppeteer` | Browser automation, screenshots | Visual inspection of rendered documents |
-| `mermaid-kroki` | Mermaid/Kroki diagram rendering | Generate architecture and flow diagrams |
 
 ## Install
 
 ```bash
-# Clone
-git clone https://github.com/YOUR_USERNAME/claude-sentinel.git
-cd claude-sentinel
-
-# Build
+git clone https://github.com/FABIOTESS/opencheir.git
+cd opencheir
 cargo build --release
-
-# Initialize (creates ~/.sentinel/sentinel.db and config)
-./target/release/sentinel init
+./target/release/opencheir init
 ```
 
 ## Configure Claude Code
 
-Add Sentinel to your Claude Code MCP settings (`~/.claude/settings.json`):
+Add to `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
-    "sentinel": {
-      "command": "/path/to/claude-sentinel/target/release/sentinel",
+    "opencheir": {
+      "command": "/path/to/opencheir",
       "args": ["serve"]
     }
   }
 }
 ```
 
-**Important:** Remove or disable the MCP servers that Sentinel replaces to avoid duplicate tools:
+## Tools
 
-- `bid-writing`
-- `tender-orchestrator`
-- `tender-rag`
-- `social-value`
-- `tender-qa`
-- `hive`
-- `lineage`
+Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 
-Servers Sentinel does **not** replace (keep these):
+### Document QA
 
-- `word-document-server` (DOCX writing)
-- `puppeteer` (browser automation)
-- `mermaid-kroki` (diagram rendering)
-- `eyes` (visual inspection)
+- `qa_check_fonts` — detect font inconsistencies in DOCX
+- `qa_check_dashes` — detect dash/hyphen inconsistencies
+- `qa_check_word_counts` — check word limits vs actual
+- `qa_check_signatures` — detect unfilled signature placeholders
+- `qa_full_check` — run all QA checks at once
 
-Restart Claude Code after changing settings.
+### Document Parsing
 
-## Verify
+- `parse_document` — extract text, tables, structure from DOCX
+- `read_content` — read specific table cell content
 
-Start a new Claude Code session and check that Sentinel tools are available:
+### Search
 
-```
-Tools should appear as mcp__sentinel__<tool_name>
-e.g. mcp__sentinel__parse_tender, mcp__sentinel__qa_check_fonts
-```
+- `search_documents` — full-text search across indexed documents
+
+### Enforcer
+
+- `enforcer_check` — check if tool call is allowed by rules
+- `enforcer_log` — view enforcement log
+- `enforcer_rules` — list all rules
+- `enforcer_toggle_rule` — enable/disable rules
+
+### Lineage
+
+- `lineage_record` — record events
+- `lineage_events` — query events
+- `lineage_timeline` — session timeline
+
+### Memory
+
+- `hive_memory_store` — store learnings
+- `hive_memory_recall` — search memory
+- `hive_memory_by_domain` — get learnings by domain
+
+### Patterns
+
+- `pattern_analyze` — discover workflow patterns
+- `pattern_list` — list discovered patterns
+
+### Status
+
+- `opencheir_status` — system health summary
+- `opencheir_health` — detailed health info
 
 ## Architecture
 
 ```
-gateway/          MCP interface (rmcp), tool routing, JSON-RPC proxy
-  server.rs       49 tool definitions, dispatches to domain/orchestration
-domain/           Business logic (stateless services)
-  tender.rs       DOCX parsing, question extraction, compliance
-  qa.rs           Font, dash, word count, signature checks
-  social_value.rs TOMs measures, calculations, suggestions
-  bid.rs          Frameworks, scoring, win themes, compliance matrix
-  eyes.rs         Capture storage, HTTP dashboard
-orchestration/    Cross-cutting workflows
-  enforcer.rs     Rule engine with sliding window
-  lineage.rs      Event tracking, timelines, dependency graphs
-  skills.rs       Skill directory scanning, YAML frontmatter
-  patterns.rs     Cross-session pattern discovery
-  hive/           Multi-agent orchestration
-    planner.rs    Goal/task planning
-    coordinator.rs DAG-based task scheduling
-    spawner.rs    Claude CLI subprocess management
-    memory.rs     FTS5-backed learning storage
-sentinel_core/    State management
-  state.rs        SQLite with WAL, Arc<Mutex<Connection>>
-  documents.rs    DOCX parsing via docx-rs
-  search.rs       FTS5 full-text search
-```
-
-## Data
-
-- `~/.sentinel/sentinel.db` — SQLite database (WAL mode)
-- `~/.sentinel/config.toml` — configuration
-- Company data is seeded from embedded JSON on `sentinel init`
-
-## Development
-
-```bash
-# Run tests (350 tests)
-cargo test
-
-# Run specific test file
-cargo test --test qa_test
-
-# Build debug
-cargo build
+opencheir/
+├── src/
+│   ├── gateway/     # MCP tool definitions & routing
+│   ├── domain/      # Document QA, image capture
+│   ├── orchestration/ # Enforcer, lineage, hive, patterns
+│   └── core/        # SQLite state, document parsing, search
+└── tests/
 ```
 
 ## License
 
-Private.
+MIT

@@ -1,5 +1,5 @@
-use sentinel::orchestration::lineage::{LineageEvent, LineageService};
-use sentinel::sentinel_core::state::StateDb;
+use opencheir::orchestration::lineage::{LineageEvent, LineageService};
+use opencheir::store::state::StateDb;
 use tempfile::TempDir;
 
 fn setup() -> (TempDir, StateDb) {
@@ -344,5 +344,5 @@ fn test_cleanup_no_old_events() {
 #[test]
 fn test_lineage_router_builds() {
     let (_dir, db) = setup();
-    let _router = sentinel::orchestration::lineage::lineage_router(db);
+    let _router = opencheir::orchestration::lineage::lineage_router(db);
 }

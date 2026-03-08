@@ -1,36 +1,21 @@
 use tempfile::TempDir;
 
 #[test]
-fn test_seed_company_data() {
+fn test_db_opens_and_creates_tables() {
     let dir = TempDir::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(&dir.path().join("test.db")).unwrap();
-    db.seed_company().unwrap();
+    let db = opencheir::store::state::StateDb::open(&dir.path().join("test.db")).unwrap();
 
-    let conn = db.conn();
-    let vat: String = conn.query_row(
-        "SELECT value FROM company WHERE key = 'vat_number'",
-        [],
-        |row| row.get(0),
-    ).unwrap();
-    assert!(!vat.is_empty());
-
-    // Verify total record count (all sections loaded)
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM company",
-        [],
-        |row| row.get(0),
-    ).unwrap();
-    assert!(total >= 20); // company + psc + insurance + turnover + references
+    let tables = db.list_tables().unwrap();
+    // Verify core tables exist
+    assert!(tables.contains(&"sessions".to_string()));
+    assert!(tables.contains(&"documents".to_string()));
+    assert!(tables.contains(&"learnings".to_string()));
 }
 
 #[test]
-fn test_seed_company_idempotent() {
+fn test_db_open_idempotent() {
     let dir = TempDir::new().unwrap();
-    let db = sentinel::sentinel_core::state::StateDb::open(&dir.path().join("test.db")).unwrap();
-    db.seed_company().unwrap();
-    db.seed_company().unwrap(); // second call should not error
-
-    let conn = db.conn();
-    let count: i64 = conn.query_row("SELECT COUNT(*) FROM company", [], |row| row.get(0)).unwrap();
-    assert!(count >= 20);
+    let db_path = dir.path().join("test.db");
+    let _db1 = opencheir::store::state::StateDb::open(&db_path).unwrap();
+    let _db2 = opencheir::store::state::StateDb::open(&db_path).unwrap(); // second open should not error
 }

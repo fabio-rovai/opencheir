@@ -22,7 +22,7 @@ impl ExternalProcess {
     /// Spawn an external process with the given command and arguments.
     ///
     /// stdin and stdout are piped for MCP communication; stderr is
-    /// suppressed so it does not leak into Sentinel's own stderr.
+    /// suppressed so it does not leak into the server's own stderr.
     /// `kill_on_drop(true)` ensures the child is cleaned up if the
     /// handle is dropped.
     pub async fn spawn(name: &str, command: &str, args: &[String]) -> anyhow::Result<Self> {

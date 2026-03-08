@@ -1,4 +1,4 @@
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 use anyhow::Result;
 use serde::Serialize;
 

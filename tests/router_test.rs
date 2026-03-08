@@ -1,4 +1,4 @@
-use sentinel::gateway::router::route_tool;
+use opencheir::gateway::router::route_tool;
 
 #[test]
 fn test_route_by_prefix() {
@@ -7,7 +7,7 @@ fn test_route_by_prefix() {
     assert_eq!(route_tool("lineage_track"), "orchestration::lineage");
     assert_eq!(route_tool("hive_orchestrate"), "orchestration::hive");
     assert_eq!(route_tool("skill_list"), "orchestration::skills");
-    assert_eq!(route_tool("sentinel_status"), "orchestration::supervisor");
+    assert_eq!(route_tool("opencheir_status"), "orchestration::supervisor");
     assert_eq!(route_tool("word_add_paragraph"), "proxy::word-document-server");
     assert_eq!(route_tool("mermaid_render"), "proxy::mermaid-kroki");
     assert_eq!(route_tool("puppeteer_click"), "proxy::puppeteer");

@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
-use sentinel::orchestration::hive::{
+use opencheir::orchestration::hive::{
     coordinator::*, memory::*, planner::*, spawner::*,
 };
-use sentinel::sentinel_core::state::StateDb;
+use opencheir::store::state::StateDb;
 use tempfile::TempDir;
 
 fn setup_db() -> (TempDir, StateDb) {

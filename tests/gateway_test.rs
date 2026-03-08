@@ -1,35 +1,35 @@
-use sentinel::gateway::server::SentinelServer;
-use sentinel::sentinel_core::state::StateDb;
+use opencheir::gateway::server::OpenCheirServer;
+use opencheir::store::state::StateDb;
 use tempfile::TempDir;
 
-fn setup() -> (TempDir, SentinelServer) {
+fn setup() -> (TempDir, OpenCheirServer) {
     let dir = TempDir::new().unwrap();
     let db = StateDb::open(&dir.path().join("test.db")).unwrap();
-    let server = SentinelServer::new(db);
+    let server = OpenCheirServer::new(db);
     (dir, server)
 }
 
 #[test]
-fn test_sentinel_server_has_tools() {
+fn test_server_has_tools() {
     let (_dir, server) = setup();
     let tools = server.list_tool_definitions();
     assert!(!tools.is_empty(), "Server should register at least one tool");
 
     let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
     assert!(
-        names.contains(&"sentinel_status"),
-        "Expected 'sentinel_status' tool, found: {:?}",
+        names.contains(&"opencheir_status"),
+        "Expected 'opencheir_status' tool, found: {:?}",
         names
     );
     assert!(
-        names.contains(&"sentinel_health"),
-        "Expected 'sentinel_health' tool, found: {:?}",
+        names.contains(&"opencheir_health"),
+        "Expected 'opencheir_health' tool, found: {:?}",
         names
     );
 }
 
 #[test]
-fn test_sentinel_server_has_domain_tools() {
+fn test_server_has_domain_tools() {
     let (_dir, server) = setup();
     let tools = server.list_tool_definitions();
     let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -54,10 +54,10 @@ fn test_sentinel_server_has_domain_tools() {
 }
 
 #[test]
-fn test_sentinel_server_tool_count() {
+fn test_server_tool_count() {
     let (_dir, server) = setup();
     let tools = server.list_tool_definitions();
-    // 2 sentinel + 8 qa + 3 lineage + 4 enforcer + 3 memory + 2 pattern + eyes
+    // 2 opencheir + 8 qa + 3 lineage + 4 enforcer + 3 memory + 2 pattern + search + eyes
     assert!(
         tools.len() >= 15,
         "Expected at least 15 tools, found: {}",
@@ -66,7 +66,7 @@ fn test_sentinel_server_tool_count() {
 }
 
 #[test]
-fn test_sentinel_server_tools_have_descriptions() {
+fn test_server_tools_have_descriptions() {
     let (_dir, server) = setup();
     let tools = server.list_tool_definitions();
     for tool in &tools {
@@ -85,7 +85,7 @@ fn test_sentinel_server_tools_have_descriptions() {
 }
 
 #[test]
-fn test_sentinel_server_is_clone() {
+fn test_server_is_clone() {
     let (_dir, server) = setup();
     let _cloned = server.clone();
 }
@@ -96,10 +96,10 @@ fn test_status_includes_tool_count() {
     let tools = server.list_tool_definitions();
     let expected_count = tools.len();
 
-    let status_tool = tools.iter().find(|t| t.name.as_ref() == "sentinel_status");
+    let status_tool = tools.iter().find(|t| t.name.as_ref() == "opencheir_status");
     assert!(
         status_tool.is_some(),
-        "sentinel_status tool must be registered"
+        "opencheir_status tool must be registered"
     );
 
     assert!(

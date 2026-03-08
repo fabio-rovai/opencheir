@@ -1,4 +1,4 @@
-use sentinel::gateway::proxy;
+use opencheir::gateway::proxy;
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 

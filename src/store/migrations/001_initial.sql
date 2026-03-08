@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS documents (
     path        TEXT NOT NULL,
     filename    TEXT NOT NULL,
     doc_type    TEXT NOT NULL,
-    tender_name TEXT,
+    project_name TEXT,
     text        TEXT,
     mtime       INTEGER,
     parsed_at   TEXT NOT NULL DEFAULT (datetime('now')),

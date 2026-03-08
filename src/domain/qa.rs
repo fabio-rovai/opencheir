@@ -1,7 +1,7 @@
 use regex::Regex;
 use serde::Serialize;
 
-use crate::sentinel_core::documents::{DocumentService, ParsedDocument};
+use crate::store::documents::{DocumentService, ParsedDocument};
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -216,7 +216,7 @@ impl QaService {
     /// Look `min_offset` to `max_offset` rows below `row_idx` in the same column
     /// for a cell with >20 words (the answer cell).
     fn find_answer_cell(
-        table: &crate::sentinel_core::documents::ParsedTable,
+        table: &crate::store::documents::ParsedTable,
         row_idx: usize,
         cell_idx: usize,
         min_offset: usize,
@@ -314,7 +314,7 @@ impl QaService {
     /// Check cells adjacent to the signature label for actual content (a name
     /// or tick mark).
     fn check_nearby_cells_for_signature(
-        table: &crate::sentinel_core::documents::ParsedTable,
+        table: &crate::store::documents::ParsedTable,
         row_idx: usize,
         cell_idx: usize,
     ) -> bool {

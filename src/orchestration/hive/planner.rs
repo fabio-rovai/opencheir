@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::sentinel_core::state::StateDb;
+use crate::store::state::StateDb;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskNode {

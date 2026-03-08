@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use regex::Regex;
 use serde::Serialize;
 
@@ -252,62 +250,6 @@ impl QaService {
     }
 
     // -----------------------------------------------------------------------
-    // check_sensitive_info
-    // -----------------------------------------------------------------------
-
-    /// Search the document for sensitive values that should not appear.
-    /// Each entry in `sensitive_values` is a (label, value) pair.
-    pub fn check_sensitive_info(
-        doc: &ParsedDocument,
-        sensitive_values: &[(String, String)],
-    ) -> QaCheckResult {
-        // Build full document text from all paragraphs + table cells
-        let mut full_text = String::new();
-
-        for para in &doc.paragraphs {
-            full_text.push_str(&para.text);
-            full_text.push('\n');
-        }
-
-        for table in &doc.tables {
-            for row in &table.rows {
-                for cell in &row.cells {
-                    full_text.push_str(&cell.text);
-                    full_text.push('\n');
-                }
-            }
-        }
-
-        let full_text_lower = full_text.to_lowercase();
-
-        let issues: Vec<QaIssue> = sensitive_values
-            .iter()
-            .filter(|(_, value)| {
-                !value.is_empty() && full_text_lower.contains(&value.to_lowercase())
-            })
-            .map(|(label, value)| QaIssue {
-                issue_type: "sensitive_info".to_string(),
-                location: "document".to_string(),
-                context: format!("Found sensitive value for '{}': '{}'", label, value),
-                severity: "critical".to_string(),
-            })
-            .collect();
-
-        let status = if issues.is_empty() {
-            "pass".to_string()
-        } else {
-            "fail".to_string()
-        };
-
-        QaCheckResult {
-            check_type: "sensitive_info".to_string(),
-            status,
-            issue_count: issues.len(),
-            issues,
-        }
-    }
-
-    // -----------------------------------------------------------------------
     // check_signatures
     // -----------------------------------------------------------------------
 
@@ -400,124 +342,6 @@ impl QaService {
     }
 
     // -----------------------------------------------------------------------
-    // check_filenames
-    // -----------------------------------------------------------------------
-
-    /// Validate file naming conventions in a folder.
-    /// Rules: no spaces, no special chars (except `-` and `_`), length <= 80,
-    /// must have a valid extension.
-    pub fn check_filenames(folder: &str) -> QaCheckResult {
-        let path = Path::new(folder);
-        let mut issues = Vec::new();
-
-        if !path.is_dir() {
-            return QaCheckResult {
-                check_type: "filenames".to_string(),
-                status: "fail".to_string(),
-                issue_count: 1,
-                issues: vec![QaIssue {
-                    issue_type: "invalid_folder".to_string(),
-                    location: folder.to_string(),
-                    context: "Folder does not exist or is not a directory".to_string(),
-                    severity: "critical".to_string(),
-                }],
-            };
-        }
-
-        let entries = match std::fs::read_dir(path) {
-            Ok(entries) => entries,
-            Err(e) => {
-                return QaCheckResult {
-                    check_type: "filenames".to_string(),
-                    status: "fail".to_string(),
-                    issue_count: 1,
-                    issues: vec![QaIssue {
-                        issue_type: "read_error".to_string(),
-                        location: folder.to_string(),
-                        context: format!("Cannot read folder: {}", e),
-                        severity: "critical".to_string(),
-                    }],
-                };
-            }
-        };
-
-        // Only allow alphanumeric, hyphen, underscore, and dot
-        let valid_chars = Regex::new(r"^[a-zA-Z0-9._-]+$").unwrap();
-
-        for entry in entries.flatten() {
-            let file_type = match entry.file_type() {
-                Ok(ft) => ft,
-                Err(_) => continue,
-            };
-
-            // Only check files, not subdirectories
-            if !file_type.is_file() {
-                continue;
-            }
-
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-
-            // Check for spaces
-            if name_str.contains(' ') {
-                issues.push(QaIssue {
-                    issue_type: "filename_spaces".to_string(),
-                    location: name_str.to_string(),
-                    context: "Filename contains spaces".to_string(),
-                    severity: "warning".to_string(),
-                });
-            }
-
-            // Check for invalid special characters
-            if !valid_chars.is_match(&name_str) {
-                // Only flag if it's not already flagged for spaces
-                if !name_str.contains(' ') {
-                    issues.push(QaIssue {
-                        issue_type: "filename_special_chars".to_string(),
-                        location: name_str.to_string(),
-                        context: "Filename contains invalid special characters".to_string(),
-                        severity: "warning".to_string(),
-                    });
-                }
-            }
-
-            // Check length
-            if name_str.len() > 80 {
-                issues.push(QaIssue {
-                    issue_type: "filename_too_long".to_string(),
-                    location: name_str.to_string(),
-                    context: format!("Filename is {} characters (max 80)", name_str.len()),
-                    severity: "warning".to_string(),
-                });
-            }
-
-            // Check for valid extension
-            let path = entry.path();
-            if path.extension().is_none() {
-                issues.push(QaIssue {
-                    issue_type: "filename_no_extension".to_string(),
-                    location: name_str.to_string(),
-                    context: "Filename has no extension".to_string(),
-                    severity: "warning".to_string(),
-                });
-            }
-        }
-
-        let status = if issues.is_empty() {
-            "pass".to_string()
-        } else {
-            "warning".to_string()
-        };
-
-        QaCheckResult {
-            check_type: "filenames".to_string(),
-            status,
-            issue_count: issues.len(),
-            issues,
-        }
-    }
-
-    // -----------------------------------------------------------------------
     // check_smart_quotes
     // -----------------------------------------------------------------------
 
@@ -555,11 +379,7 @@ impl QaService {
     // -----------------------------------------------------------------------
 
     /// Run all QA checks on a document and aggregate results.
-    pub fn full_check(
-        doc: &ParsedDocument,
-        folder: Option<&str>,
-        sensitive: &[(String, String)],
-    ) -> FullCheckResult {
+    pub fn full_check(doc: &ParsedDocument) -> FullCheckResult {
         let mut checks = Vec::new();
 
         // Font check — convert to QaCheckResult
@@ -608,16 +428,8 @@ impl QaService {
             issues: wc_issues,
         });
 
-        // Sensitive info
-        checks.push(Self::check_sensitive_info(doc, sensitive));
-
         // Signatures
         checks.push(Self::check_signatures(doc));
-
-        // Filenames (if folder provided)
-        if let Some(folder) = folder {
-            checks.push(Self::check_filenames(folder));
-        }
 
         // Aggregate
         let total_issues: usize = checks.iter().map(|c| c.issue_count).sum();

@@ -26,7 +26,7 @@ OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforceme
 ## Install
 
 ```bash
-git clone https://github.com/FABIOTESS/opencheir.git
+git clone https://github.com/fabio-rovai/opencheir.git
 cd opencheir
 cargo build --release
 ./target/release/opencheir init

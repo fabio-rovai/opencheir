@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Lightweight, open-source document governance MCP server"
 license = "MIT"
-repository = "https://github.com/FABIOTESS/opencheir"
+repository = "https://github.com/fabio-rovai/opencheir"
 
 [[bin]]
 name = "opencheir"

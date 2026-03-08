@@ -75,17 +75,17 @@ pub struct Enforcer {
 }
 
 impl Enforcer {
-    /// Create a new enforcer pre-loaded with the 6 built-in rules.
+    /// Create a new enforcer pre-loaded with the built-in rules.
     pub fn new() -> Self {
         let rules = vec![
             // 1. QA after docx write
             Rule {
                 name: "qa_after_docx_write".into(),
-                description: "tender_write_answer called but no qa_ tool in last 3 calls".into(),
+                description: "Document write tool called but no qa_ tool in last 3 calls".into(),
                 action: Action::Warn,
                 enabled: true,
                 condition: RuleCondition::MissingInWindow {
-                    trigger: "tender_write_answer".into(),
+                    trigger: "write_document".into(),
                     required: "qa_".into(),
                     window: 3,
                 },
@@ -93,55 +93,19 @@ impl Enforcer {
             // 2. Render after edit
             Rule {
                 name: "render_after_edit".into(),
-                description: "3+ tender_write_answer calls without tender_render".into(),
+                description: "3+ document write calls without render".into(),
                 action: Action::Warn,
                 enabled: true,
                 condition: RuleCondition::RepeatWithout {
-                    category: "tender_write_answer".into(),
+                    category: "write_document".into(),
                     count: 3,
-                    required: "tender_render".into(),
+                    required: "render_document".into(),
                 },
             },
-            // 3. RAG before bid
-            Rule {
-                name: "rag_before_bid".into(),
-                description: "bid_ generation tool without search_tenders in last 5 calls".into(),
-                action: Action::Warn,
-                enabled: true,
-                condition: RuleCondition::MissingInWindow {
-                    trigger: "bid_".into(),
-                    required: "search_tenders".into(),
-                    window: 5,
-                },
-            },
-            // 4. Parse before write
-            Rule {
-                name: "parse_before_write".into(),
-                description: "tender_write_answer without tender_parse in entire history".into(),
-                action: Action::Block,
-                enabled: true,
-                condition: RuleCondition::MissingInWindow {
-                    trigger: "tender_write_answer".into(),
-                    required: "tender_parse".into(),
-                    window: usize::MAX,
-                },
-            },
-            // 5. Health gate (stub)
+            // 3. Health gate (stub)
             Rule {
                 name: "health_gate".into(),
                 description: "Stub -- health check integration is Phase 7.2".into(),
-                action: Action::Allow,
-                enabled: true,
-                condition: RuleCondition::MissingInWindow {
-                    trigger: "__never_match__".into(),
-                    required: "__never_match__".into(),
-                    window: 0,
-                },
-            },
-            // 6. Sensitive data gate (stub)
-            Rule {
-                name: "sensitive_data_gate".into(),
-                description: "Stub -- content inspection needs more wiring".into(),
                 action: Action::Allow,
                 enabled: true,
                 condition: RuleCondition::MissingInWindow {

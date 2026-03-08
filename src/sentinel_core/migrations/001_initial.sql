@@ -32,28 +32,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
     tokenize='porter unicode61'
 );
 
-CREATE TABLE IF NOT EXISTS questions (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    doc_id          INTEGER NOT NULL REFERENCES documents(id),
-    question_id     TEXT NOT NULL,
-    text            TEXT,
-    word_limit      INTEGER,
-    question_type   TEXT NOT NULL,
-    answer          TEXT,
-    table_index     INTEGER,
-    row_index       INTEGER,
-    cell_index      INTEGER,
-    score_weight    REAL,
-    parsed_at       TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS company (
-    key         TEXT PRIMARY KEY,
-    value       TEXT NOT NULL,
-    sensitive   INTEGER DEFAULT 0,
-    category    TEXT
-);
-
 CREATE TABLE IF NOT EXISTS qa_results (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id  TEXT REFERENCES sessions(id),
@@ -62,28 +40,6 @@ CREATE TABLE IF NOT EXISTS qa_results (
     status      TEXT NOT NULL,
     details     TEXT,
     checked_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS toms (
-    reference       TEXT PRIMARY KEY,
-    theme           TEXT NOT NULL,
-    outcome         TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    units           TEXT,
-    proxy_value     REAL,
-    definition      TEXT,
-    target_requirements TEXT,
-    evidence_required   TEXT,
-    unit_guidance       TEXT,
-    tags            TEXT
-);
-
-CREATE TABLE IF NOT EXISTS frameworks (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    category    TEXT,
-    content     TEXT NOT NULL,
-    tags        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events (

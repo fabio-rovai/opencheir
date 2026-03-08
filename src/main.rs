@@ -1,14 +1,13 @@
 use clap::{Parser, Subcommand};
 use rmcp::ServiceExt;
 
-use sentinel::config::expand_tilde;
-use sentinel::gateway::server::SentinelServer;
-use sentinel::sentinel_core::state::StateDb;
+use opencheir::config::expand_tilde;
+use opencheir::gateway::server::SentinelServer;
+use opencheir::sentinel_core::state::StateDb;
 
 const DEFAULT_CONFIG: &str = r#"[general]
-data_dir = "~/.sentinel"
-tenders_root = "~/Desktop/Tenders"
-skills_dir = "~/.sentinel/skills"
+data_dir = "~/.opencheir"
+skills_dir = "~/.opencheir/skills"
 personal_skills_dir = "~/.claude/skills"
 
 [supervisor]
@@ -32,7 +31,7 @@ max_image_width = 800
 "#;
 
 #[derive(Parser)]
-#[command(name = "sentinel", about = "One brain to rule them all")]
+#[command(name = "opencheir", about = "One brain to rule them all")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -40,16 +39,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize sentinel: create DB, seed data, update settings
+    /// Initialize opencheir: create DB and default config
     Init {
-        /// Path to sentinel data directory
-        #[arg(long, default_value = "~/.sentinel")]
+        /// Path to opencheir data directory
+        #[arg(long, default_value = "~/.opencheir")]
         data_dir: String,
     },
     /// Start the MCP server
     Serve {
         /// Path to config file
-        #[arg(long, default_value = "~/.sentinel/config.toml")]
+        #[arg(long, default_value = "~/.opencheir/config.toml")]
         config: String,
     },
 }
@@ -68,13 +67,9 @@ async fn main() -> anyhow::Result<()> {
             println!("Created data directory: {data_dir}");
 
             // Create DB
-            let db_path = data_path.join("sentinel.db");
+            let db_path = data_path.join("opencheir.db");
             let db = StateDb::open(&db_path)?;
             println!("Initialized database: {}", db_path.display());
-
-            // Seed company data
-            db.seed_company()?;
-            println!("Seeded company data");
 
             // Create default config
             let config_path = data_path.join("config.toml");
@@ -85,12 +80,12 @@ async fn main() -> anyhow::Result<()> {
                 println!("Config already exists: {}", config_path.display());
             }
 
-            println!("\nSentinel initialized successfully!");
+            println!("\nOpenCheir initialized successfully!");
         }
         Commands::Serve { config: _config } => {
             // TODO: load config and use data_dir from it
-            let data_dir = expand_tilde("~/.sentinel");
-            let db_path = std::path::Path::new(&data_dir).join("sentinel.db");
+            let data_dir = expand_tilde("~/.opencheir");
+            let db_path = std::path::Path::new(&data_dir).join("opencheir.db");
             let db = StateDb::open(&db_path)?;
             let server = SentinelServer::new(db);
             let service = server.serve(rmcp::transport::stdio()).await?;

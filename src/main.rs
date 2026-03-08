@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use rmcp::ServiceExt;
 
 use opencheir::config::expand_tilde;
-use opencheir::gateway::server::SentinelServer;
+use opencheir::gateway::server::OpenCheirServer;
 use opencheir::sentinel_core::state::StateDb;
 
 const DEFAULT_CONFIG: &str = r#"[general]
@@ -87,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
             let data_dir = expand_tilde("~/.opencheir");
             let db_path = std::path::Path::new(&data_dir).join("opencheir.db");
             let db = StateDb::open(&db_path)?;
-            let server = SentinelServer::new(db);
+            let server = OpenCheirServer::new(db);
             let service = server.serve(rmcp::transport::stdio()).await?;
             service.waiting().await?;
         }

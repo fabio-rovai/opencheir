@@ -1,0 +1,86 @@
+# Sentinel Configuration
+# Copy this file to ~/.sentinel/config.toml and adjust as needed.
+# All values shown are the defaults — uncomment and change only what you need.
+
+[general]
+# Base directory for sentinel data (database, skills, etc.)
+# data_dir = "~/.sentinel"
+
+# Root directory where tender projects are stored
+# tenders_root = "~/Desktop/Tenders"
+
+# Directory for shared skill definitions
+# skills_dir = "~/.sentinel/skills"
+
+# Directory for personal/private skill definitions
+# personal_skills_dir = "~/.claude/skills"
+
+[supervisor]
+# How often the supervisor checks child-process health
+# health_check_interval = "5s"
+
+# Maximum restart attempts before giving up on a crashed process
+# max_restart_attempts = 3
+
+# Cooldown period between restart attempts
+# restart_cooldown = "60s"
+
+# Number of events between pattern-analysis passes
+# pattern_analysis_interval = 100
+
+[enforcer]
+# Whether the policy enforcer is active
+# enabled = true
+
+# Default action when no policy matches: "block" or "allow"
+# default_action = "block"
+
+[hive]
+# Maximum number of concurrent Claude agents
+# max_agents = 5
+
+# Path to the Claude CLI binary
+# claude_path = "claude"
+
+# Default model for spawned agents
+# default_model = "claude-sonnet-4-6"
+
+# Timeout for a single agent invocation
+# agent_timeout = "300s"
+
+[eyes]
+# Port for the eyes (visual inspection) HTTP server (0 = auto-assign)
+# port = 0
+
+# Maximum width for rendered images (pixels)
+# max_image_width = 800
+
+[search]
+# TF-IDF maximum feature count
+# max_features = 20000
+
+# N-gram range for tokenisation [min, max]
+# ngram_range = [1, 2]
+
+# Minimum document frequency for a term
+# min_df = 2
+
+# Maximum document frequency ratio (0.0–1.0) for a term
+# max_df = 0.9
+
+[lineage]
+# Port for the lineage tracking HTTP API (0 = auto-assign)
+# http_port = 0
+
+# External MCP servers managed by the supervisor.
+# Each entry is a table keyed by server name.
+#
+# [external_servers.word-document-server]
+# command = "npx"
+# args = ["-y", "@anthropic/word-document-server"]
+# enabled = true
+#
+# [external_servers.mermaid-kroki]
+# command = "npx"
+# args = ["-y", "@anthropic/mermaid-kroki-server"]
+# enabled = true

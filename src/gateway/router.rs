@@ -6,14 +6,8 @@
 pub fn route_tool(name: &str) -> &'static str {
     // Order doesn't matter -- we match the first prefix that fits.
     // Each arm strips the prefix and delegates to the appropriate module path.
-    if name.starts_with("tender_") {
-        "domain::tender"
-    } else if name.starts_with("qa_") {
+    if name.starts_with("qa_") {
         "domain::qa"
-    } else if name.starts_with("sv_") {
-        "domain::social_value"
-    } else if name.starts_with("bid_") {
-        "domain::bid"
     } else if name.starts_with("eyes_") {
         "domain::eyes"
     } else if name.starts_with("lineage_") {
@@ -22,8 +16,16 @@ pub fn route_tool(name: &str) -> &'static str {
         "orchestration::hive"
     } else if name.starts_with("skill_") {
         "orchestration::skills"
-    } else if name.starts_with("sentinel_") {
+    } else if name.starts_with("opencheir_") {
         "orchestration::supervisor"
+    } else if name.starts_with("enforcer_") {
+        "orchestration::enforcer"
+    } else if name.starts_with("pattern_") {
+        "orchestration::patterns"
+    } else if name.starts_with("search_") {
+        "sentinel_core::search"
+    } else if name.starts_with("doc_") {
+        "sentinel_core::documents"
     } else if name.starts_with("word_") {
         "proxy::word-document-server"
     } else if name.starts_with("mermaid_") {
@@ -43,15 +45,16 @@ mod tests {
 
     #[test]
     fn test_route_all_prefixes() {
-        assert_eq!(route_tool("tender_parse"), "domain::tender");
         assert_eq!(route_tool("qa_check_fonts"), "domain::qa");
-        assert_eq!(route_tool("sv_suggest"), "domain::social_value");
-        assert_eq!(route_tool("bid_score"), "domain::bid");
         assert_eq!(route_tool("eyes_capture"), "domain::eyes");
         assert_eq!(route_tool("lineage_track"), "orchestration::lineage");
         assert_eq!(route_tool("hive_orchestrate"), "orchestration::hive");
         assert_eq!(route_tool("skill_list"), "orchestration::skills");
-        assert_eq!(route_tool("sentinel_status"), "orchestration::supervisor");
+        assert_eq!(route_tool("opencheir_status"), "orchestration::supervisor");
+        assert_eq!(route_tool("enforcer_check"), "orchestration::enforcer");
+        assert_eq!(route_tool("pattern_analyze"), "orchestration::patterns");
+        assert_eq!(route_tool("search_documents"), "sentinel_core::search");
+        assert_eq!(route_tool("doc_parse"), "sentinel_core::documents");
         assert_eq!(route_tool("word_add_paragraph"), "proxy::word-document-server");
         assert_eq!(route_tool("mermaid_render"), "proxy::mermaid-kroki");
         assert_eq!(route_tool("puppeteer_click"), "proxy::puppeteer");

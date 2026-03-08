@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Top-level configuration for Sentinel.
+/// Top-level configuration for OpenCheir.
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -51,7 +51,6 @@ impl Config {
 #[serde(default)]
 pub struct GeneralConfig {
     pub data_dir: String,
-    pub tenders_root: String,
     pub skills_dir: String,
     pub personal_skills_dir: String,
 }
@@ -59,9 +58,8 @@ pub struct GeneralConfig {
 impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
-            data_dir: "~/.sentinel".into(),
-            tenders_root: "~/Desktop/Tenders".into(),
-            skills_dir: "~/.sentinel/skills".into(),
+            data_dir: "~/.opencheir".into(),
+            skills_dir: "~/.opencheir/skills".into(),
             personal_skills_dir: "~/.claude/skills".into(),
         }
     }

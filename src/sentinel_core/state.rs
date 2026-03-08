@@ -60,30 +60,6 @@ impl StateDb {
         Ok(id)
     }
 
-    pub fn seed_company(&self) -> Result<()> {
-        let json_str = include_str!("../../data/company.json");
-        let data: serde_json::Value = serde_json::from_str(json_str)?;
-
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "INSERT OR IGNORE INTO company (key, value, sensitive, category) VALUES (?1, ?2, ?3, ?4)"
-        )?;
-
-        for section in ["company", "psc", "insurance", "turnover", "reference_contracts"] {
-            if let Some(items) = data.get(section).and_then(|v| v.as_array()) {
-                for item in items {
-                    stmt.execute(rusqlite::params![
-                        item["key"].as_str().unwrap_or_default(),
-                        item["value"].as_str().unwrap_or_default(),
-                        item["sensitive"].as_i64().unwrap_or(0),
-                        item["category"].as_str().unwrap_or_default(),
-                    ])?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.conn.lock().unwrap()
     }

@@ -6,12 +6,13 @@ use opencheir::orchestration::enforcer::*;
 fn test_new_has_builtin_rules() {
     let enforcer = Enforcer::new();
     let rules = enforcer.rules();
-    assert_eq!(rules.len(), 3);
+    assert_eq!(rules.len(), 4);
 
     let names: Vec<&str> = rules.iter().map(|r| r.name.as_str()).collect();
     assert!(names.contains(&"qa_after_docx_write"));
     assert!(names.contains(&"render_after_edit"));
     assert!(names.contains(&"health_gate"));
+    assert!(names.contains(&"onto_validate_after_save"));
 }
 
 // -- 2. Unrelated tool -> Allow --
@@ -145,7 +146,21 @@ fn test_log_verdict_and_get_log() {
     );
 }
 
-// -- 9. Get log empty --
+// -- 9. Onto validate after save warns --
+
+#[test]
+fn test_onto_validate_after_save_rule() {
+    let mut enforcer = Enforcer::new();
+    // Simulate onto_save calls without validation
+    enforcer.post_check("onto_save");
+    enforcer.post_check("onto_save");
+    enforcer.post_check("onto_save");
+    let verdict = enforcer.pre_check("onto_save");
+    // Should warn that onto_validate hasn't been called
+    assert!(matches!(verdict.action, Action::Warn));
+}
+
+// -- 10. Get log empty --
 
 #[test]
 fn test_get_log_empty() {

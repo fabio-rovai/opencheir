@@ -114,6 +114,18 @@ impl Enforcer {
                     window: 0,
                 },
             },
+            // 4. Ontology validate after save
+            Rule {
+                name: "onto_validate_after_save".into(),
+                description: "Warn if ontology is saved 3+ times without validation".into(),
+                action: Action::Warn,
+                enabled: true,
+                condition: RuleCondition::RepeatWithout {
+                    category: "onto_save".into(),
+                    count: 3,
+                    required: "onto_validate".into(),
+                },
+            },
         ];
 
         Self {

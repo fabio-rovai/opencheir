@@ -9,6 +9,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::orchestration::enforcer::{Action, Enforcer};
+use crate::store::graph::GraphStore;
 use crate::store::state::StateDb;
 
 // ─── MCP tool input structs ─────────────────────────────────────────────────
@@ -120,6 +121,61 @@ pub struct PatternListInput {
     pub category: Option<String>,
 }
 
+// Ontology
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoValidateInput {
+    /// Path to an RDF file OR inline Turtle content
+    pub input: String,
+    /// If true, treat input as inline content rather than a file path
+    pub inline: Option<bool>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoConvertInput {
+    /// Path to source RDF file
+    pub path: String,
+    /// Target format: turtle, ntriples, rdfxml, nquads, trig
+    pub to: String,
+    /// Optional output file path (if omitted, returns content)
+    pub output: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoLoadInput {
+    /// Path to RDF file to load into the in-memory store
+    pub path: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoQueryInput {
+    /// SPARQL query string
+    pub query: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoSaveInput {
+    /// Output file path
+    pub path: String,
+    /// Format: turtle, ntriples, rdfxml, nquads, trig
+    pub format: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoDiffInput {
+    /// Path to the old/original ontology file
+    pub old_path: String,
+    /// Path to the new/modified ontology file
+    pub new_path: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoLintInput {
+    /// Path to RDF file to lint, OR inline Turtle content
+    pub input: String,
+    /// If true, treat input as inline content
+    pub inline: Option<bool>,
+}
+
 // ─── OpenCheirServer ────────────────────────────────────────────────────────
 
 /// MCP server that exposes all OpenCheir tools to Claude via stdin/stdout.
@@ -128,6 +184,7 @@ pub struct OpenCheirServer {
     tool_router: ToolRouter<Self>,
     db: StateDb,
     enforcer: Arc<Mutex<Enforcer>>,
+    graph: Arc<GraphStore>,
 }
 
 impl OpenCheirServer {
@@ -137,6 +194,7 @@ impl OpenCheirServer {
             tool_router: Self::tool_router(),
             db,
             enforcer: Arc::new(Mutex::new(Enforcer::new())),
+            graph: Arc::new(GraphStore::new()),
         }
     }
 
@@ -395,6 +453,104 @@ impl OpenCheirServer {
         use crate::orchestration::patterns::PatternService;
         match PatternService::list(&self.db, input.category.as_deref()) {
             Ok(patterns) => serde_json::to_string(&patterns).unwrap_or_default(),
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    // ── Ontology ─────────────────────────────────────────────────────────
+
+    #[tool(name = "onto_validate", description = "Validate RDF/OWL syntax. Accepts a file path or inline Turtle content.")]
+    async fn onto_validate(&self, Parameters(input): Parameters<OntoValidateInput>) -> String {
+        use crate::domain::ontology::OntologyService;
+        if input.inline.unwrap_or(false) {
+            OntologyService::validate_string(&input.input).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+        } else {
+            OntologyService::validate_file(&input.input).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+        }
+    }
+
+    #[tool(name = "onto_convert", description = "Convert an RDF file between formats: turtle, ntriples, rdfxml, nquads, trig")]
+    async fn onto_convert(&self, Parameters(input): Parameters<OntoConvertInput>) -> String {
+        let store = GraphStore::new();
+        match store.load_file(&input.path) {
+            Ok(_) => {
+                match store.serialize(&input.to) {
+                    Ok(content) => {
+                        if let Some(output) = input.output {
+                            match std::fs::write(&output, &content) {
+                                Ok(_) => format!(r#"{{"ok":true,"path":"{}","format":"{}"}}"#, output, input.to),
+                                Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+                            }
+                        } else {
+                            content
+                        }
+                    }
+                    Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+                }
+            }
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "onto_load", description = "Load an RDF file into the in-memory ontology store for querying")]
+    async fn onto_load(&self, Parameters(input): Parameters<OntoLoadInput>) -> String {
+        match self.graph.load_file(&input.path) {
+            Ok(count) => format!(r#"{{"ok":true,"triples_loaded":{},"path":"{}"}}"#, count, input.path),
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "onto_query", description = "Run a SPARQL query against the loaded ontology store")]
+    async fn onto_query(&self, Parameters(input): Parameters<OntoQueryInput>) -> String {
+        self.graph.sparql_select(&input.query).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_save", description = "Save the current ontology store to a file")]
+    async fn onto_save(&self, Parameters(input): Parameters<OntoSaveInput>) -> String {
+        let format = input.format.as_deref().unwrap_or("turtle");
+        match self.graph.save_file(&input.path, format) {
+            Ok(_) => format!(r#"{{"ok":true,"path":"{}","format":"{}"}}"#, input.path, format),
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "onto_stats", description = "Get statistics about the loaded ontology (triple count, classes, properties, individuals)")]
+    fn onto_stats(&self) -> String {
+        self.graph.get_stats().unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_diff", description = "Compare two ontology files and show added/removed triples")]
+    async fn onto_diff(&self, Parameters(input): Parameters<OntoDiffInput>) -> String {
+        use crate::domain::ontology::OntologyService;
+        let old = match std::fs::read_to_string(&input.old_path) {
+            Ok(c) => c,
+            Err(e) => return format!(r#"{{"error":"Cannot read {}: {}"}}"#, input.old_path, e),
+        };
+        let new = match std::fs::read_to_string(&input.new_path) {
+            Ok(c) => c,
+            Err(e) => return format!(r#"{{"error":"Cannot read {}: {}"}}"#, input.new_path, e),
+        };
+        OntologyService::diff(&old, &new).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_lint", description = "Check an ontology for quality issues: missing labels, comments, domains, ranges")]
+    async fn onto_lint(&self, Parameters(input): Parameters<OntoLintInput>) -> String {
+        use crate::domain::ontology::OntologyService;
+        let content = if input.inline.unwrap_or(false) {
+            input.input.clone()
+        } else {
+            match std::fs::read_to_string(&input.input) {
+                Ok(c) => c,
+                Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+            }
+        };
+        OntologyService::lint(&content).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_clear", description = "Clear all triples from the in-memory ontology store")]
+    fn onto_clear(&self) -> String {
+        match self.graph.clear() {
+            Ok(_) => r#"{"ok":true,"message":"Store cleared"}"#.to_string(),
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),
         }
     }

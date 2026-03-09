@@ -176,6 +176,42 @@ pub struct OntoLintInput {
     pub inline: Option<bool>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoPullInput {
+    /// Remote URL or SPARQL endpoint to fetch ontology from
+    pub url: String,
+    /// If true, treat url as a SPARQL endpoint and run a CONSTRUCT query
+    pub sparql: Option<bool>,
+    /// Optional SPARQL CONSTRUCT query (required if sparql=true)
+    pub query: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoPushInput {
+    /// Remote SPARQL endpoint URL
+    pub endpoint: String,
+    /// Optional named graph IRI
+    pub graph: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoImportInput {
+    /// Resolve and load all owl:imports from the currently loaded ontology
+    pub max_depth: Option<usize>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoVersionInput {
+    /// Version label (e.g. "v1.0", "draft-2026-03-09")
+    pub label: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OntoRollbackInput {
+    /// Version label to restore
+    pub label: String,
+}
+
 // ─── OpenCheirServer ────────────────────────────────────────────────────────
 
 /// MCP server that exposes all OpenCheir tools to Claude via stdin/stdout.
@@ -553,6 +589,131 @@ impl OpenCheirServer {
             Ok(_) => r#"{"ok":true,"message":"Store cleared"}"#.to_string(),
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),
         }
+    }
+
+    #[tool(name = "onto_pull", description = "Fetch an ontology from a remote URL or SPARQL endpoint and load it into the store")]
+    async fn onto_pull(&self, Parameters(input): Parameters<OntoPullInput>) -> String {
+        use crate::store::graph::GraphStore;
+        if input.sparql.unwrap_or(false) {
+            let query = input.query.as_deref().unwrap_or("CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }");
+            match GraphStore::fetch_sparql(&input.url, query).await {
+                Ok(content) => {
+                    match self.graph.load_turtle(&content, None) {
+                        Ok(count) => format!(r#"{{"ok":true,"triples_loaded":{},"source":"{}"}}"#, count, input.url),
+                        Err(e) => format!(r#"{{"error":"Parse error: {}"}}"#, e),
+                    }
+                }
+                Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+            }
+        } else {
+            match GraphStore::fetch_url(&input.url).await {
+                Ok(content) => {
+                    match self.graph.load_turtle(&content, None) {
+                        Ok(count) => format!(r#"{{"ok":true,"triples_loaded":{},"source":"{}"}}"#, count, input.url),
+                        Err(e) => format!(r#"{{"error":"Parse error: {}"}}"#, e),
+                    }
+                }
+                Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+            }
+        }
+    }
+
+    #[tool(name = "onto_push", description = "Push the current ontology store to a remote SPARQL endpoint")]
+    async fn onto_push(&self, Parameters(input): Parameters<OntoPushInput>) -> String {
+        use crate::store::graph::GraphStore;
+        match self.graph.serialize("ntriples") {
+            Ok(content) => {
+                match GraphStore::push_sparql(&input.endpoint, &content).await {
+                    Ok(msg) => format!(r#"{{"ok":true,"message":"{}"}}"#, msg),
+                    Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+                }
+            }
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "onto_import", description = "Resolve and load all owl:imports from the currently loaded ontology")]
+    async fn onto_import(&self, Parameters(input): Parameters<OntoImportInput>) -> String {
+        use crate::store::graph::GraphStore;
+        let max_depth = input.max_depth.unwrap_or(3);
+        let mut imported = Vec::new();
+        let mut to_import: Vec<String> = Vec::new();
+
+        let query = "SELECT ?import WHERE { ?onto <http://www.w3.org/2002/07/owl#imports> ?import }";
+        if let Ok(result) = self.graph.sparql_select(query) {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&result) {
+                if let Some(results) = parsed["results"].as_array() {
+                    for row in results {
+                        if let Some(uri) = row["import"].as_str() {
+                            let uri = uri.trim_matches(|c| c == '<' || c == '>');
+                            to_import.push(uri.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut depth = 0;
+        while !to_import.is_empty() && depth < max_depth {
+            let batch = to_import.drain(..).collect::<Vec<_>>();
+            for url in batch {
+                if imported.contains(&url) { continue; }
+                match GraphStore::fetch_url(&url).await {
+                    Ok(content) => {
+                        match self.graph.load_turtle(&content, None) {
+                            Ok(_count) => {
+                                imported.push(url.clone());
+                                if let Ok(result) = self.graph.sparql_select(query) {
+                                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&result) {
+                                        if let Some(results) = parsed["results"].as_array() {
+                                            for row in results {
+                                                if let Some(uri) = row["import"].as_str() {
+                                                    let uri = uri.trim_matches(|c| c == '<' || c == '>').to_string();
+                                                    if !imported.contains(&uri) && !to_import.contains(&uri) {
+                                                        to_import.push(uri);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => { imported.push(format!("FAILED:{}: {}", url, e)); }
+                        }
+                    }
+                    Err(e) => { imported.push(format!("FAILED:{}: {}", url, e)); }
+                }
+            }
+            depth += 1;
+        }
+
+        serde_json::json!({
+            "ok": true,
+            "imported": imported,
+            "total": imported.len(),
+            "depth": depth,
+        }).to_string()
+    }
+
+    #[tool(name = "onto_version", description = "Save a named snapshot of the current ontology store")]
+    async fn onto_version(&self, Parameters(input): Parameters<OntoVersionInput>) -> String {
+        use crate::domain::ontology::OntologyService;
+        OntologyService::save_version(&self.db, &self.graph, &input.label)
+            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_history", description = "List all saved ontology version snapshots")]
+    fn onto_history(&self) -> String {
+        use crate::domain::ontology::OntologyService;
+        OntologyService::list_versions(&self.db)
+            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+    }
+
+    #[tool(name = "onto_rollback", description = "Restore the ontology store to a previously saved version")]
+    async fn onto_rollback(&self, Parameters(input): Parameters<OntoRollbackInput>) -> String {
+        use crate::domain::ontology::OntologyService;
+        OntologyService::rollback_version(&self.db, &self.graph, &input.label)
+            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
     }
 }
 

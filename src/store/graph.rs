@@ -11,6 +11,12 @@ pub struct GraphStore {
     store: Mutex<Store>,
 }
 
+impl Default for GraphStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GraphStore {
     pub fn new() -> Self {
         Self {
@@ -149,14 +155,10 @@ impl GraphStore {
         let individual_query = "SELECT (COUNT(DISTINCT ?i) AS ?count) WHERE { ?i a ?c . FILTER(?c != <http://www.w3.org/2002/07/owl#Class> && ?c != <http://www.w3.org/2000/01/rdf-schema#Class> && ?c != <http://www.w3.org/2002/07/owl#ObjectProperty> && ?c != <http://www.w3.org/2002/07/owl#DatatypeProperty> && ?c != <http://www.w3.org/2002/07/owl#Ontology>) }";
 
         let count_from_query = |q: &str| -> usize {
-            if let Ok(QueryResults::Solutions(solutions)) = store.query(q) {
-                if let Some(Ok(row)) = solutions.into_iter().next() {
-                    if let Some(Term::Literal(lit)) = row.get("count") {
-                        return lit.value().parse().unwrap_or(0);
-                    }
-                }
-            }
-            0
+            let Ok(QueryResults::Solutions(solutions)) = store.query(q) else { return 0 };
+            let Some(Ok(row)) = solutions.into_iter().next() else { return 0 };
+            let Some(Term::Literal(lit)) = row.get("count") else { return 0 };
+            lit.value().parse().unwrap_or(0)
         };
 
         let classes = count_from_query(class_query) + count_from_query(rdfs_class_query);

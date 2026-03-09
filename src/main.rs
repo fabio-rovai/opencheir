@@ -166,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
             // Keep watcher alive until server exits
             let _watcher = watcher;
 
-            let server = OpenCheirServer::new(db, enforcer);
+            let server = OpenCheirServer::new(db, enforcer, cfg.hive.lock_ttl_seconds);
             let service = server.serve(rmcp::transport::stdio()).await?;
             service.waiting().await?;
         }

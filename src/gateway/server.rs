@@ -241,16 +241,18 @@ pub struct OpenCheirServer {
     db: StateDb,
     enforcer: Arc<Mutex<Enforcer>>,
     graph: Arc<GraphStore>,
+    lock_ttl_seconds: u32,
 }
 
 impl OpenCheirServer {
     /// Create a new server with all tools wired to domain/orchestration services.
-    pub fn new(db: StateDb, enforcer: Arc<Mutex<Enforcer>>) -> Self {
+    pub fn new(db: StateDb, enforcer: Arc<Mutex<Enforcer>>, lock_ttl_seconds: u32) -> Self {
         Self {
             tool_router: Self::tool_router(),
             db,
             enforcer,
             graph: Arc::new(GraphStore::new()),
+            lock_ttl_seconds,
         }
     }
 
@@ -484,15 +486,19 @@ impl OpenCheirServer {
         use crate::orchestration::hive::locks::LockService;
         use crate::orchestration::hive::memory::MemoryService;
 
-        // Reject write if domain is locked by someone else
-        if let Ok(Some(lock)) = LockService::check(&self.db, &input.domain) {
-            let caller_token = input.token.as_deref().unwrap_or("");
-            if lock.token != caller_token {
-                return format!(
-                    r#"{{"error":"domain '{}' is locked by '{}' until {}"}}"#,
-                    input.domain, lock.locked_by, lock.expires_at
-                );
+        // Advisory lock check — Err blocks write to avoid silent data races
+        match LockService::check(&self.db, &input.domain) {
+            Err(e) => return format!(r#"{{"error":"lock check failed: {}"}}"#, e),
+            Ok(Some(lock)) => {
+                let caller_token = input.token.as_deref().unwrap_or("");
+                if lock.token != caller_token {
+                    return format!(
+                        r#"{{"error":"domain '{}' is locked by '{}' until {}"}}"#,
+                        input.domain, lock.locked_by, lock.expires_at
+                    );
+                }
             }
+            Ok(None) => {}
         }
 
         let tags: Vec<&str> = input.tags.as_ref()
@@ -525,7 +531,7 @@ impl OpenCheirServer {
     #[tool(name = "hive_claim_domain", description = "Claim exclusive write access to a hive memory domain. Returns a token required for hive_memory_store.")]
     async fn hive_claim_domain(&self, Parameters(input): Parameters<HiveClaimDomainInput>) -> String {
         use crate::orchestration::hive::locks::LockService;
-        let ttl = input.ttl_seconds.unwrap_or(60);
+        let ttl = input.ttl_seconds.unwrap_or(self.lock_ttl_seconds);
         match LockService::claim(&self.db, &input.domain, &input.locked_by, ttl) {
             Ok(r) => serde_json::to_string(&r).unwrap_or_default(),
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),

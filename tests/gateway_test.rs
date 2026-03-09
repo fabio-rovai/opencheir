@@ -8,7 +8,7 @@ fn setup() -> (TempDir, OpenCheirServer) {
     let dir = TempDir::new().unwrap();
     let db = StateDb::open(&dir.path().join("test.db")).unwrap();
     let enforcer = Arc::new(Mutex::new(Enforcer::new()));
-    let server = OpenCheirServer::new(db, enforcer);
+    let server = OpenCheirServer::new(db, enforcer, 60);
     (dir, server)
 }
 

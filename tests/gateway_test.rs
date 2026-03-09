@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use opencheir::gateway::server::OpenCheirServer;
 use opencheir::orchestration::enforcer::Enforcer;
 use opencheir::store::state::StateDb;

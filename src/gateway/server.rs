@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use rmcp::{
     ServerHandler, tool, tool_handler, tool_router,
@@ -417,7 +418,7 @@ impl OpenCheirServer {
 
     #[tool(name = "enforcer_check", description = "Check if a tool call is allowed by enforcer rules and record it")]
     async fn enforcer_check(&self, Parameters(input): Parameters<EnforcerCheckInput>) -> String {
-        let mut enforcer = self.enforcer.lock().unwrap();
+        let mut enforcer = self.enforcer.lock().await;
         let verdict = enforcer.pre_check(&input.tool_name);
         enforcer.post_check(&input.tool_name);
         let action_str = match verdict.action {
@@ -440,8 +441,8 @@ impl OpenCheirServer {
     }
 
     #[tool(name = "enforcer_rules", description = "List all enforcer rules and their enabled status")]
-    fn enforcer_rules(&self) -> String {
-        let enforcer = self.enforcer.lock().unwrap();
+    async fn enforcer_rules(&self) -> String {
+        let enforcer = self.enforcer.lock().await;
         let rules: Vec<serde_json::Value> = enforcer.rules().iter().map(|r| {
             serde_json::json!({
                 "name": r.name,
@@ -468,7 +469,7 @@ impl OpenCheirServer {
             }
         }
         // Update in-memory cache
-        let mut enforcer = self.enforcer.lock().unwrap();
+        let mut enforcer = self.enforcer.lock().await;
         let in_memory_updated = enforcer.set_rule_enabled(&input.rule_name, input.enabled);
         if !in_memory_updated {
             return format!(

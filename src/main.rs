@@ -26,6 +26,7 @@ max_agents = 5
 claude_path = "claude"
 default_model = "claude-sonnet-4-6"
 agent_timeout = "300s"
+lock_ttl_seconds = 60
 
 [eyes]
 port = 0
@@ -70,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
 
             // Create DB
             let db_path = data_path.join("opencheir.db");
-            let db = StateDb::open(&db_path)?;
+            let _db = StateDb::open(&db_path)?;
             println!("Initialized database: {}", db_path.display());
 
             // Create default config
@@ -115,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
             let enforcer = {
                 let mut e = Enforcer::new();
                 e.reload_from_db(&db)?;
-                std::sync::Arc::new(std::sync::Mutex::new(e))
+                std::sync::Arc::new(tokio::sync::Mutex::new(e))
             };
 
             // ── File watcher for config hot-reload ───────────────────────────────────
@@ -153,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
                             tracing::warn!("seed rules on reload failed: {e}");
                             continue;
                         }
-                        let mut e = enforcer_arc.lock().unwrap();
+                        let mut e = enforcer_arc.lock().await;
                         if let Err(e) = e.reload_from_db(&db_watch) {
                             tracing::warn!("reload_from_db failed: {e}");
                         } else {

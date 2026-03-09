@@ -6,13 +6,14 @@ use opencheir::orchestration::enforcer::*;
 fn test_new_has_builtin_rules() {
     let enforcer = Enforcer::new();
     let rules = enforcer.rules();
-    assert_eq!(rules.len(), 4);
+    assert_eq!(rules.len(), 5);
 
     let names: Vec<&str> = rules.iter().map(|r| r.name.as_str()).collect();
     assert!(names.contains(&"qa_after_docx_write"));
     assert!(names.contains(&"render_after_edit"));
     assert!(names.contains(&"health_gate"));
     assert!(names.contains(&"onto_validate_after_save"));
+    assert!(names.contains(&"onto_version_before_push"));
 }
 
 // -- 2. Unrelated tool -> Allow --

@@ -126,6 +126,18 @@ impl Enforcer {
                     required: "onto_validate".into(),
                 },
             },
+            // 5. Version before push
+            Rule {
+                name: "onto_version_before_push".into(),
+                description: "Warn if pushing without a saved version snapshot".into(),
+                action: Action::Warn,
+                enabled: true,
+                condition: RuleCondition::MissingInWindow {
+                    trigger: "onto_push".into(),
+                    required: "onto_version".into(),
+                    window: 5,
+                },
+            },
         ];
 
         Self {

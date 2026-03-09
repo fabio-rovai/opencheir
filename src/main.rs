@@ -4,6 +4,8 @@ use rmcp::ServiceExt;
 use opencheir::config::{expand_tilde, Config};
 use opencheir::gateway::server::OpenCheirServer;
 use opencheir::store::state::StateDb;
+use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
+use tokio::sync::watch;
 
 const DEFAULT_CONFIG: &str = r#"[general]
 data_dir = "~/.opencheir"
@@ -115,6 +117,57 @@ async fn main() -> anyhow::Result<()> {
                 e.reload_from_db(&db)?;
                 std::sync::Arc::new(std::sync::Mutex::new(e))
             };
+
+            // ── File watcher for config hot-reload ───────────────────────────────────
+            let (reload_tx, reload_rx) = watch::channel(());
+
+            let mut watcher = {
+                let tx = reload_tx.clone();
+                recommended_watcher(move |res: notify::Result<Event>| {
+                    if res.map(|e| e.kind.is_modify() || e.kind.is_create()).unwrap_or(false) {
+                        let _ = tx.send(());
+                    }
+                })?
+            };
+            watcher.watch(
+                std::path::Path::new(&config_path),
+                RecursiveMode::NonRecursive,
+            )?;
+
+            // Background task: re-seed DB and reload enforcer in-memory on config change
+            {
+                let enforcer_arc = std::sync::Arc::clone(&enforcer);
+                let db_watch = db.clone();
+                let path_watch = config_path.clone();
+                tokio::spawn(async move {
+                    let mut rx = reload_rx;
+                    loop {
+                        if rx.changed().await.is_err() {
+                            break;
+                        }
+                        let new_cfg = match Config::load(std::path::Path::new(&path_watch)) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                tracing::warn!("config reload failed: {e}");
+                                continue;
+                            }
+                        };
+                        if let Err(e) = Enforcer::seed_config_rules_to_db(&db_watch, &new_cfg.enforcer.rules) {
+                            tracing::warn!("seed rules on reload failed: {e}");
+                            continue;
+                        }
+                        let mut e = enforcer_arc.lock().unwrap();
+                        if let Err(e) = e.reload_from_db(&db_watch) {
+                            tracing::warn!("reload_from_db failed: {e}");
+                        } else {
+                            tracing::info!("enforcer rules hot-reloaded from {path_watch}");
+                        }
+                    }
+                });
+            }
+
+            // Keep watcher alive until server exits
+            let _watcher = watcher;
 
             let server = OpenCheirServer::new(db, enforcer);
             let service = server.serve(rmcp::transport::stdio()).await?;

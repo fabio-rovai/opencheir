@@ -6,6 +6,8 @@ use oxigraph::sparql::QueryResults;
 use oxigraph::store::Store;
 
 use crate::store::graph::GraphStore;
+use crate::store::state::StateDb;
+use std::sync::Arc;
 
 pub struct OntologyService;
 
@@ -175,5 +177,56 @@ impl OntologyService {
             "issue_count": issues.len(),
         })
         .to_string())
+    }
+
+    /// Save a named version (snapshot) of the current graph store.
+    pub fn save_version(db: &StateDb, store: &Arc<GraphStore>, label: &str) -> anyhow::Result<String> {
+        let content = store.snapshot("ntriples")?;
+        let count = store.triple_count();
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO ontology_versions (label, triple_count, content, format) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![label, count as i64, content, "ntriples"],
+        )?;
+        Ok(serde_json::json!({
+            "ok": true,
+            "label": label,
+            "triple_count": count,
+        }).to_string())
+    }
+
+    /// List all saved ontology versions.
+    pub fn list_versions(db: &StateDb) -> anyhow::Result<String> {
+        let conn = db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT id, label, triple_count, format, created_at FROM ontology_versions ORDER BY id DESC"
+        )?;
+        let versions: Vec<serde_json::Value> = stmt.query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, i64>(0)?,
+                "label": row.get::<_, String>(1)?,
+                "triple_count": row.get::<_, i64>(2)?,
+                "format": row.get::<_, String>(3)?,
+                "created_at": row.get::<_, String>(4)?,
+            }))
+        })?.filter_map(|r| r.ok()).collect();
+        Ok(serde_json::json!({"versions": versions}).to_string())
+    }
+
+    /// Rollback the graph store to a previously saved version.
+    pub fn rollback_version(db: &StateDb, store: &Arc<GraphStore>, label: &str) -> anyhow::Result<String> {
+        let conn = db.conn();
+        let content: String = conn.query_row(
+            "SELECT content FROM ontology_versions WHERE label = ?1 ORDER BY id DESC LIMIT 1",
+            rusqlite::params![label],
+            |row| row.get(0),
+        )?;
+        store.clear()?;
+        let count = store.load_ntriples(&content)?;
+        Ok(serde_json::json!({
+            "ok": true,
+            "label": label,
+            "triples_restored": count,
+        }).to_string())
     }
 }

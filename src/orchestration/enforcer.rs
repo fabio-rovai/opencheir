@@ -367,11 +367,13 @@ impl Enforcer {
         db: &StateDb,
         rules: &[crate::config::RuleConfig],
     ) -> anyhow::Result<()> {
-        let conn = db.conn();
+        // Build all (name, description, condition_json, action_str, enabled) tuples
+        // before acquiring the lock, so serialisation happens outside the mutex.
+        let mut rows: Vec<(String, String, String, String, i32)> = Vec::new();
         for rule in rules {
             let condition = match Self::condition_from_config(&rule.condition) {
-                Some(c) => c,
-                None => {
+                Ok(Some(c)) => c,
+                Ok(None) => {
                     tracing::warn!(
                         "skipping rule '{}': unrecognised condition type '{}'",
                         rule.name,
@@ -379,37 +381,58 @@ impl Enforcer {
                     );
                     continue;
                 }
+                Err(msg) => {
+                    tracing::warn!("skipping rule '{}': {msg}", rule.name);
+                    continue;
+                }
+            };
+            let action_str = match rule.action.as_str() {
+                s @ ("block" | "warn" | "allow") => s.to_string(),
+                other => {
+                    tracing::warn!("skipping rule '{}': unknown action '{other}'", rule.name);
+                    continue;
+                }
             };
             let condition_json = serde_json::to_string(&condition)?;
             let enabled = rule.enabled.unwrap_or(true) as i32;
+            rows.push((
+                rule.name.clone(),
+                rule.description.as_deref().unwrap_or("").to_string(),
+                condition_json,
+                action_str,
+                enabled,
+            ));
+        }
+
+        // Acquire lock once for all inserts.
+        let conn = db.conn();
+        for (name, description, condition_json, action_str, enabled) in rows {
             conn.execute(
                 "INSERT OR REPLACE INTO rules (name, description, condition, action, enabled) \
                  VALUES (?1, ?2, ?3, ?4, ?5)",
-                rusqlite::params![
-                    rule.name,
-                    rule.description.as_deref().unwrap_or(""),
-                    condition_json,
-                    rule.action,
-                    enabled,
-                ],
+                rusqlite::params![name, description, condition_json, action_str, enabled],
             )?;
         }
         Ok(())
     }
 
-    fn condition_from_config(cfg: &crate::config::RuleConditionConfig) -> Option<RuleCondition> {
+    fn condition_from_config(
+        cfg: &crate::config::RuleConditionConfig,
+    ) -> Result<Option<RuleCondition>, String> {
         match cfg.kind.as_str() {
-            "MissingInWindow" => Some(RuleCondition::MissingInWindow {
-                trigger: cfg.trigger.clone()?,
-                required: cfg.required.clone()?,
-                window: cfg.window?,
-            }),
-            "RepeatWithout" => Some(RuleCondition::RepeatWithout {
-                category: cfg.category.clone()?,
-                count: cfg.count?,
-                required: cfg.required.clone()?,
-            }),
-            _ => None,
+            "MissingInWindow" => {
+                let trigger = cfg.trigger.clone().ok_or("MissingInWindow requires 'trigger'")?;
+                let required = cfg.required.clone().ok_or("MissingInWindow requires 'required'")?;
+                let window = cfg.window.ok_or("MissingInWindow requires 'window'")?;
+                Ok(Some(RuleCondition::MissingInWindow { trigger, required, window }))
+            }
+            "RepeatWithout" => {
+                let category = cfg.category.clone().ok_or("RepeatWithout requires 'category'")?;
+                let count = cfg.count.ok_or("RepeatWithout requires 'count'")?;
+                let required = cfg.required.clone().ok_or("RepeatWithout requires 'required'")?;
+                Ok(Some(RuleCondition::RepeatWithout { category, count, required }))
+            }
+            _ => Ok(None), // unknown kind — caller handles the warning
         }
     }
 

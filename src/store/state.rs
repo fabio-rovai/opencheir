@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 const MIGRATION: &str = include_str!("migrations/001_initial.sql");
+const MIGRATION_002: &str = include_str!("migrations/002_ontology_versions.sql");
 
 #[derive(Clone)]
 pub struct StateDb {
@@ -31,6 +32,7 @@ impl StateDb {
             .join("\n");
 
         conn.execute_batch(&ddl)?;
+        conn.execute_batch(MIGRATION_002)?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

@@ -67,10 +67,17 @@ fn test_convert_turtle_to_ntriples() {
 
 #[test]
 fn test_load_from_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.ttl");
+    std::fs::write(&path, r#"
+        @prefix ex: <http://example.org/> .
+        ex:Alice a ex:Person .
+    "#).unwrap();
+
     let store = GraphStore::new();
-    let result = store.load_file("tests/data/sample.ttl");
-    // Will fail until we create test data, that's fine
-    assert!(result.is_ok() || result.is_err());
+    let result = store.load_file(path.to_str().unwrap());
+    assert!(result.is_ok());
+    assert_eq!(store.triple_count(), 1);
 }
 
 #[test]

@@ -316,13 +316,13 @@ impl Enforcer {
     /// Replace the in-memory rule-set with everything in the `rules` table.
     /// The sliding window (recent_calls) is left untouched.
     pub fn reload_from_db(&mut self, db: &StateDb) -> anyhow::Result<()> {
-        let conn = db.conn();
-        let mut stmt = conn.prepare(
-            "SELECT name, description, condition, action, enabled FROM rules",
-        )?;
-
-        let rules: Vec<Rule> = stmt
-            .query_map([], |row| {
+        // Collect raw rows while holding the lock, then release it before processing.
+        let raw: Vec<(String, String, String, String, i32)> = {
+            let conn = db.conn();
+            let mut stmt = conn.prepare(
+                "SELECT name, description, condition, action, enabled FROM rules",
+            )?;
+            stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -332,20 +332,28 @@ impl Enforcer {
                 ))
             })?
             .filter_map(|r| r.ok())
+            .collect()
+        }; // MutexGuard dropped here
+
+        let rules: Vec<Rule> = raw
+            .into_iter()
             .filter_map(|(name, description, condition_json, action_str, enabled)| {
-                let condition: RuleCondition = serde_json::from_str(&condition_json).ok()?;
+                let condition: RuleCondition = serde_json::from_str(&condition_json)
+                    .map_err(|e| {
+                        tracing::warn!("skipping rule '{name}': invalid condition JSON: {e}");
+                        e
+                    })
+                    .ok()?;
                 let action = match action_str.as_str() {
                     "block" => Action::Block,
                     "warn" => Action::Warn,
-                    _ => Action::Allow,
+                    "allow" => Action::Allow,
+                    other => {
+                        tracing::warn!("skipping rule '{name}': unknown action '{other}'");
+                        return None;
+                    }
                 };
-                Some(Rule {
-                    name,
-                    description,
-                    action,
-                    enabled: enabled != 0,
-                    condition,
-                })
+                Some(Rule { name, description, action, enabled: enabled != 0, condition })
             })
             .collect();
 
@@ -426,14 +434,15 @@ mod tests {
     use crate::store::state::StateDb;
     use tempfile::tempdir;
 
-    fn test_db() -> StateDb {
+    fn test_db() -> (tempfile::TempDir, StateDb) {
         let dir = tempdir().unwrap();
-        StateDb::open(&dir.path().join("test.db")).unwrap()
+        let db = StateDb::open(&dir.path().join("test.db")).unwrap();
+        (dir, db)
     }
 
     #[test]
     fn test_seed_and_reload() {
-        let db = test_db();
+        let (_dir, db) = test_db();
         Enforcer::seed_builtins_to_db(&db).unwrap();
         let mut e = Enforcer::new();
         e.reload_from_db(&db).unwrap();

@@ -4,6 +4,30 @@ Lightweight, open-source document governance MCP server written in Rust.
 
 OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforcement, audit trails, and multi-agent orchestration as a single MCP binary.
 
+```mermaid
+flowchart TD
+    Claude["Claude"]
+    MCP["MCP Server"]
+    Enforcer["Enforcer"]
+    Ontology["Ontology"]
+    QA["QA"]
+    Documents["Documents"]
+    Eyes["Eyes"]
+    StateDb["StateDb — SQLite"]
+    GraphStore["GraphStore — Oxigraph"]
+
+    Claude --> MCP
+    MCP --> Enforcer
+    MCP --> Ontology
+    MCP --> QA
+    MCP --> Documents
+    MCP --> Eyes
+    Enforcer --> StateDb
+    QA --> StateDb
+    Documents --> StateDb
+    Ontology --> GraphStore
+```
+
 ## Features
 
 | Module | Tools | Purpose |
@@ -16,7 +40,7 @@ OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforceme
 | Patterns | 2 | Cross-session pattern discovery |
 | Memory | 3 | Persistent learning storage |
 | Hive | - | Multi-agent orchestration |
-| Ontology | 9 | RDF/OWL validation, SPARQL queries, format conversion, diff, lint |
+| Ontology | 15 | RDF/OWL validation, SPARQL, format conversion, diff, lint, remote sync, versioning |
 | Status | 2 | Health monitoring |
 
 ## Requirements
@@ -104,6 +128,12 @@ Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 - `onto_diff` — compare two ontology files (added/removed triples)
 - `onto_lint` — check for missing labels, comments, domains
 - `onto_clear` — clear in-memory store
+- `onto_pull` — fetch ontology from remote URL or SPARQL endpoint
+- `onto_push` — push ontology to a SPARQL endpoint
+- `onto_import` — resolve and load owl:imports chain
+- `onto_version` — save a named snapshot of the current store
+- `onto_history` — list saved version snapshots
+- `onto_rollback` — restore a previous version
 
 ### Status
 

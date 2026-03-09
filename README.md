@@ -16,6 +16,7 @@ OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforceme
 | Patterns | 2 | Cross-session pattern discovery |
 | Memory | 3 | Persistent learning storage |
 | Hive | - | Multi-agent orchestration |
+| Ontology | 9 | RDF/OWL validation, SPARQL queries, format conversion, diff, lint |
 | Status | 2 | Health monitoring |
 
 ## Requirements
@@ -92,6 +93,18 @@ Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 - `pattern_analyze` — discover workflow patterns
 - `pattern_list` — list discovered patterns
 
+### Ontology
+
+- `onto_validate` — validate RDF/OWL syntax (file or inline)
+- `onto_convert` — convert between formats (Turtle, N-Triples, RDF/XML, N-Quads, TriG)
+- `onto_load` — load RDF into in-memory store
+- `onto_query` — run SPARQL queries against loaded ontology
+- `onto_save` — save ontology store to file
+- `onto_stats` — triple count, classes, properties, individuals
+- `onto_diff` — compare two ontology files (added/removed triples)
+- `onto_lint` — check for missing labels, comments, domains
+- `onto_clear` — clear in-memory store
+
 ### Status
 
 - `opencheir_status` — system health summary
@@ -103,7 +116,7 @@ Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 opencheir/
 ├── src/
 │   ├── gateway/     # MCP tool definitions & routing
-│   ├── domain/      # Document QA, image capture
+│   ├── domain/      # Document QA, ontology engine, image capture
 │   ├── orchestration/ # Enforcer, lineage, hive, patterns
 │   └── core/        # SQLite state, document parsing, search
 └── tests/

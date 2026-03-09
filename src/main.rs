@@ -121,14 +121,11 @@ async fn main() -> anyhow::Result<()> {
             // ── File watcher for config hot-reload ───────────────────────────────────
             let (reload_tx, reload_rx) = watch::channel(());
 
-            let mut watcher = {
-                let tx = reload_tx.clone();
-                recommended_watcher(move |res: notify::Result<Event>| {
-                    if res.map(|e| e.kind.is_modify() || e.kind.is_create()).unwrap_or(false) {
-                        let _ = tx.send(());
-                    }
-                })?
-            };
+            let mut watcher = recommended_watcher(move |res: notify::Result<Event>| {
+                if res.map(|e| e.kind.is_modify() || e.kind.is_create()).unwrap_or(false) {
+                    let _ = reload_tx.send(());
+                }
+            })?;
             watcher.watch(
                 std::path::Path::new(&config_path),
                 RecursiveMode::NonRecursive,

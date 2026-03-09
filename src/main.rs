@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use rmcp::ServiceExt;
 
-use opencheir::config::expand_tilde;
+use opencheir::config::{expand_tilde, Config};
 use opencheir::gateway::server::OpenCheirServer;
 use opencheir::store::state::StateDb;
 
@@ -82,12 +82,30 @@ async fn main() -> anyhow::Result<()> {
 
             println!("\nOpenCheir initialized successfully!");
         }
-        Commands::Serve { config: _config } => {
-            // TODO: load config and use data_dir from it
-            let data_dir = expand_tilde("~/.opencheir");
+        Commands::Serve { config: config_path } => {
+            use opencheir::orchestration::enforcer::Enforcer;
+
+            let config_path = expand_tilde(&config_path);
+            let cfg = Config::load(std::path::Path::new(&config_path))
+                .unwrap_or_default();
+            let data_dir = expand_tilde(&cfg.general.data_dir);
             let db_path = std::path::Path::new(&data_dir).join("opencheir.db");
             let db = StateDb::open(&db_path)?;
-            let server = OpenCheirServer::new(db);
+
+            // Seed built-in rules (INSERT OR IGNORE), then TOML overrides (INSERT OR REPLACE)
+            Enforcer::seed_builtins_to_db(&db)?;
+            if !cfg.enforcer.rules.is_empty() {
+                Enforcer::seed_config_rules_to_db(&db, &cfg.enforcer.rules)?;
+            }
+
+            // Load initial rule-set from DB into in-memory enforcer
+            let enforcer = {
+                let mut e = Enforcer::new();
+                e.reload_from_db(&db)?;
+                std::sync::Arc::new(std::sync::Mutex::new(e))
+            };
+
+            let server = OpenCheirServer::new(db, enforcer);
             let service = server.serve(rmcp::transport::stdio()).await?;
             service.waiting().await?;
         }

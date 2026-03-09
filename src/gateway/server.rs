@@ -225,11 +225,11 @@ pub struct OpenCheirServer {
 
 impl OpenCheirServer {
     /// Create a new server with all tools wired to domain/orchestration services.
-    pub fn new(db: StateDb) -> Self {
+    pub fn new(db: StateDb, enforcer: Arc<Mutex<Enforcer>>) -> Self {
         Self {
             tool_router: Self::tool_router(),
             db,
-            enforcer: Arc::new(Mutex::new(Enforcer::new())),
+            enforcer,
             graph: Arc::new(GraphStore::new()),
         }
     }
@@ -433,12 +433,22 @@ impl OpenCheirServer {
 
     #[tool(name = "enforcer_toggle_rule", description = "Enable or disable an enforcer rule")]
     async fn enforcer_toggle_rule(&self, Parameters(input): Parameters<EnforcerRuleToggleInput>) -> String {
-        let mut enforcer = self.enforcer.lock().unwrap();
-        if enforcer.set_rule_enabled(&input.rule_name, input.enabled) {
-            format!(r#"{{"ok":true,"rule":"{}","enabled":{}}}"#, input.rule_name, input.enabled)
-        } else {
-            format!(r#"{{"error":"Rule '{}' not found"}}"#, input.rule_name)
+        // Persist to DB first so the toggle survives hot-reloads
+        {
+            let conn = self.db.conn();
+            match conn.execute(
+                "UPDATE rules SET enabled = ?1 WHERE name = ?2",
+                rusqlite::params![input.enabled as i32, input.rule_name],
+            ) {
+                Ok(0) => return format!(r#"{{"error":"Rule '{}' not found in DB"}}"#, input.rule_name),
+                Err(e) => return format!(r#"{{"error":"{}"}}"#, e),
+                Ok(_) => {}
+            }
         }
+        // Update in-memory cache
+        let mut enforcer = self.enforcer.lock().unwrap();
+        enforcer.set_rule_enabled(&input.rule_name, input.enabled);
+        format!(r#"{{"ok":true,"rule":"{}","enabled":{}}}"#, input.rule_name, input.enabled)
     }
 
     // ── Memory ──────────────────────────────────────────────────────────────

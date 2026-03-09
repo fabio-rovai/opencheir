@@ -9,23 +9,25 @@ flowchart TD
     Claude["Claude"]
     MCP["MCP Server"]
     Enforcer["Enforcer"]
-    Ontology["Ontology"]
     QA["QA"]
     Documents["Documents"]
     Eyes["Eyes"]
+    Hive["Hive Memory"]
+    Lineage["Lineage"]
     StateDb["StateDb — SQLite"]
-    GraphStore["GraphStore — Oxigraph"]
 
     Claude --> MCP
     MCP --> Enforcer
-    MCP --> Ontology
     MCP --> QA
     MCP --> Documents
     MCP --> Eyes
+    MCP --> Hive
+    MCP --> Lineage
     Enforcer --> StateDb
     QA --> StateDb
     Documents --> StateDb
-    Ontology --> GraphStore
+    Hive --> StateDb
+    Lineage --> StateDb
 ```
 
 ## Features
@@ -35,13 +37,14 @@ flowchart TD
 | Document QA | 5 | Font, dash, word count, signature checks |
 | Document Parsing | 2 | DOCX structure extraction |
 | Search | 1 | FTS5 full-text search |
-| Enforcer | 4 | Workflow rule engine |
+| Enforcer | 4 | Workflow rule engine with hot-reload |
 | Lineage | 3 | Audit trail & event tracking |
 | Patterns | 2 | Cross-session pattern discovery |
 | Memory | 3 | Persistent learning storage |
-| Hive | - | Multi-agent orchestration |
-| Ontology | 15 | RDF/OWL validation, SPARQL, format conversion, diff, lint, remote sync, versioning |
+| Hive | 2 | Domain locking for multi-agent |
 | Status | 2 | Health monitoring |
+
+> For ontology engineering (RDF/OWL/SPARQL), see [Open Ontologies](https://github.com/fabio-rovai/open-ontologies).
 
 ## Requirements
 
@@ -66,6 +69,23 @@ Add to `~/.claude/settings.json`:
   "mcpServers": {
     "opencheir": {
       "command": "/path/to/opencheir",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+For ontology engineering, also add [Open Ontologies](https://github.com/fabio-rovai/open-ontologies):
+
+```json
+{
+  "mcpServers": {
+    "opencheir": {
+      "command": "/path/to/opencheir",
+      "args": ["serve"]
+    },
+    "open-ontologies": {
+      "command": "/path/to/open-ontologies",
       "args": ["serve"]
     }
   }
@@ -116,24 +136,6 @@ Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 
 - `pattern_analyze` — discover workflow patterns
 - `pattern_list` — list discovered patterns
-
-### Ontology
-
-- `onto_validate` — validate RDF/OWL syntax (file or inline)
-- `onto_convert` — convert between formats (Turtle, N-Triples, RDF/XML, N-Quads, TriG)
-- `onto_load` — load RDF into in-memory store
-- `onto_query` — run SPARQL queries against loaded ontology
-- `onto_save` — save ontology store to file
-- `onto_stats` — triple count, classes, properties, individuals
-- `onto_diff` — compare two ontology files (added/removed triples)
-- `onto_lint` — check for missing labels, comments, domains
-- `onto_clear` — clear in-memory store
-- `onto_pull` — fetch ontology from remote URL or SPARQL endpoint
-- `onto_push` — push ontology to a SPARQL endpoint
-- `onto_import` — resolve and load owl:imports chain
-- `onto_version` — save a named snapshot of the current store
-- `onto_history` — list saved version snapshots
-- `onto_rollback` — restore a previous version
 
 ### Status
 
@@ -187,10 +189,10 @@ Locks expire automatically (default TTL: 60 seconds, configurable per-claim via 
 ```
 opencheir/
 ├── src/
-│   ├── gateway/     # MCP tool definitions & routing
-│   ├── domain/      # Document QA, ontology engine, image capture
+│   ├── gateway/       # MCP tool definitions & routing
+│   ├── domain/        # Document QA, image capture
 │   ├── orchestration/ # Enforcer, lineage, hive, patterns
-│   └── core/        # SQLite state, document parsing, search
+│   └── store/         # SQLite state, document parsing, search
 └── tests/
 ```
 

@@ -1,11 +1,15 @@
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use opencheir::gateway::server::OpenCheirServer;
+use opencheir::orchestration::enforcer::Enforcer;
 use opencheir::store::state::StateDb;
 use tempfile::TempDir;
 
 fn setup() -> (TempDir, OpenCheirServer) {
     let dir = TempDir::new().unwrap();
     let db = StateDb::open(&dir.path().join("test.db")).unwrap();
-    let server = OpenCheirServer::new(db);
+    let enforcer = Arc::new(Mutex::new(Enforcer::new()));
+    let server = OpenCheirServer::new(db, enforcer, 60);
     (dir, server)
 }
 

@@ -92,6 +92,8 @@ impl Default for SupervisorConfig {
 pub struct EnforcerConfig {
     pub enabled: bool,
     pub default_action: String,
+    #[serde(default)]
+    pub rules: Vec<RuleConfig>,
 }
 
 impl Default for EnforcerConfig {
@@ -99,8 +101,32 @@ impl Default for EnforcerConfig {
         Self {
             enabled: true,
             default_action: "block".into(),
+            rules: Vec::new(),
         }
     }
+}
+
+/// A single enforcer rule defined in TOML config.
+#[derive(Debug, Deserialize, Clone)]
+pub struct RuleConfig {
+    pub name: String,
+    pub description: Option<String>,
+    pub action: String,
+    pub enabled: Option<bool>,
+    pub condition: RuleConditionConfig,
+}
+
+/// Flat TOML representation of a rule condition.
+#[derive(Debug, Deserialize, Clone)]
+pub struct RuleConditionConfig {
+    /// "MissingInWindow" or "RepeatWithout"
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub trigger: Option<String>,
+    pub required: Option<String>,
+    pub window: Option<usize>,
+    pub category: Option<String>,
+    pub count: Option<usize>,
 }
 
 /// Hive agent orchestration settings.
@@ -111,6 +137,7 @@ pub struct HiveConfig {
     pub claude_path: String,
     pub default_model: String,
     pub agent_timeout: String,
+    pub lock_ttl_seconds: u32,
 }
 
 impl Default for HiveConfig {
@@ -120,6 +147,7 @@ impl Default for HiveConfig {
             claude_path: "claude".into(),
             default_model: "claude-sonnet-4-6".into(),
             agent_timeout: "300s".into(),
+            lock_ttl_seconds: 60,
         }
     }
 }

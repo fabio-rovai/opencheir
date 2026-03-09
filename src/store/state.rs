@@ -5,7 +5,15 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 const MIGRATION: &str = include_str!("migrations/001_initial.sql");
+const MIGRATION_002: &str = include_str!("migrations/002_ontology_versions.sql");
+const MIGRATION_003: &str = include_str!("migrations/003_domain_locks.sql");
 
+/// SQLite-backed state store.
+///
+/// Uses `std::sync::Mutex` rather than `tokio::sync::Mutex` because every
+/// database call is a short, synchronous SQLite operation. No MutexGuard is
+/// held across `.await` points. If async DB calls are added later, migrate
+/// to `tokio::sync::Mutex` or use `spawn_blocking`.
 #[derive(Clone)]
 pub struct StateDb {
     conn: Arc<Mutex<Connection>>,
@@ -31,6 +39,8 @@ impl StateDb {
             .join("\n");
 
         conn.execute_batch(&ddl)?;
+        conn.execute_batch(MIGRATION_002)?;
+        conn.execute_batch(MIGRATION_003)?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

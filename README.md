@@ -140,6 +140,48 @@ Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
 - `opencheir_status` — system health summary
 - `opencheir_health` — detailed health info
 
+## Enforcer hot-reload
+
+Enforcement rules are loaded from the `rules` table in the SQLite database on startup. Built-in rules are seeded automatically; custom rules can be added in `config.toml`:
+
+```toml
+[[enforcer.rules]]
+name = "my_rule"
+description = "Warn if writing without a prior read in last 5 calls"
+action = "warn"
+enabled = true
+
+[enforcer.rules.condition]
+type = "MissingInWindow"
+trigger = "write_document"
+required = "read_document"
+window = 5
+```
+
+While the server is running, edit and save `config.toml`. OpenCheir detects the change and reloads rules within milliseconds — no restart needed. The sliding window of recent tool calls is preserved across reloads.
+
+Toggles via `enforcer_toggle_rule` are written to the DB and survive hot-reloads.
+
+## Domain locking
+
+When two agents write to the same hive memory domain concurrently, last write wins by default. Domain locking prevents this.
+
+**Pattern:**
+
+```
+1. hive_claim_domain  →  returns { token, expires_at }
+2. hive_memory_store (with token)  →  write succeeds
+3. hive_release_domain  →  lock released
+```
+
+If another agent tries to write to a locked domain without the matching token, it receives:
+
+```json
+{"error": "domain 'ops' is locked by 'agent-1' until 2026-03-09T12:01:00"}
+```
+
+Locks expire automatically (default TTL: 60 seconds, configurable per-claim via `ttl_seconds` and globally via `[hive] lock_ttl_seconds` in `config.toml`). Locking is opt-in — unlocked domains work exactly as before.
+
 ## Architecture
 
 ```

@@ -100,6 +100,8 @@ pub struct MemoryStoreInput {
     pub context: Option<String>,
     /// Tags for categorisation
     pub tags: Option<Vec<String>>,
+    /// Lock token from hive_claim_domain (required if domain is locked)
+    pub token: Option<String>,
 }
 #[derive(Deserialize, JsonSchema)]
 pub struct MemoryRecallInput {
@@ -479,7 +481,20 @@ impl OpenCheirServer {
 
     #[tool(name = "hive_memory_store", description = "Store a learning/insight in the persistent memory system")]
     async fn hive_memory_store(&self, Parameters(input): Parameters<MemoryStoreInput>) -> String {
+        use crate::orchestration::hive::locks::LockService;
         use crate::orchestration::hive::memory::MemoryService;
+
+        // Reject write if domain is locked by someone else
+        if let Ok(Some(lock)) = LockService::check(&self.db, &input.domain) {
+            let caller_token = input.token.as_deref().unwrap_or("");
+            if lock.token != caller_token {
+                return format!(
+                    r#"{{"error":"domain '{}' is locked by '{}' until {}"}}"#,
+                    input.domain, lock.locked_by, lock.expires_at
+                );
+            }
+        }
+
         let tags: Vec<&str> = input.tags.as_ref()
             .map(|t| t.iter().map(|s| s.as_str()).collect())
             .unwrap_or_default();

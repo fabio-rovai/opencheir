@@ -361,6 +361,58 @@ impl Enforcer {
         Ok(())
     }
 
+    /// Seed rules from TOML config into the DB.
+    /// Uses INSERT OR REPLACE so TOML always wins for named rules.
+    pub fn seed_config_rules_to_db(
+        db: &StateDb,
+        rules: &[crate::config::RuleConfig],
+    ) -> anyhow::Result<()> {
+        let conn = db.conn();
+        for rule in rules {
+            let condition = match Self::condition_from_config(&rule.condition) {
+                Some(c) => c,
+                None => {
+                    tracing::warn!(
+                        "skipping rule '{}': unrecognised condition type '{}'",
+                        rule.name,
+                        rule.condition.kind
+                    );
+                    continue;
+                }
+            };
+            let condition_json = serde_json::to_string(&condition)?;
+            let enabled = rule.enabled.unwrap_or(true) as i32;
+            conn.execute(
+                "INSERT OR REPLACE INTO rules (name, description, condition, action, enabled) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![
+                    rule.name,
+                    rule.description.as_deref().unwrap_or(""),
+                    condition_json,
+                    rule.action,
+                    enabled,
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn condition_from_config(cfg: &crate::config::RuleConditionConfig) -> Option<RuleCondition> {
+        match cfg.kind.as_str() {
+            "MissingInWindow" => Some(RuleCondition::MissingInWindow {
+                trigger: cfg.trigger.clone()?,
+                required: cfg.required.clone()?,
+                window: cfg.window?,
+            }),
+            "RepeatWithout" => Some(RuleCondition::RepeatWithout {
+                category: cfg.category.clone()?,
+                count: cfg.count?,
+                required: cfg.required.clone()?,
+            }),
+            _ => None,
+        }
+    }
+
     // -- private helpers --
 
     fn matches_condition(&self, tool_name: &str, condition: &RuleCondition) -> bool {
@@ -451,6 +503,33 @@ mod tests {
             e.rules().iter().find(|r| r.name == "qa_after_docx_write").unwrap().enabled,
             true
         );
+    }
+
+    #[test]
+    fn test_seed_config_rules() {
+        use crate::config::RuleConfig;
+        let (_dir, db) = test_db();
+        Enforcer::seed_builtins_to_db(&db).unwrap();
+
+        let custom = vec![RuleConfig {
+            name: "custom_test_rule".into(),
+            description: Some("test".into()),
+            action: "warn".into(),
+            enabled: Some(true),
+            condition: crate::config::RuleConditionConfig {
+                kind: "MissingInWindow".into(),
+                trigger: Some("foo".into()),
+                required: Some("bar".into()),
+                window: Some(2),
+                category: None,
+                count: None,
+            },
+        }];
+        Enforcer::seed_config_rules_to_db(&db, &custom).unwrap();
+
+        let mut e = Enforcer::new();
+        e.reload_from_db(&db).unwrap();
+        assert!(e.rules().iter().any(|r| r.name == "custom_test_rule"));
     }
 
     #[test]

@@ -54,15 +54,9 @@ glob = "0.3"
 # Image handling (eyes)
 image = "0.25"
 
-# HTTP client (health checks)
-reqwest = { version = "0.12", features = ["json"] }
-
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# RDF / SPARQL / OWL engine (ontology module)
-oxigraph = "0.4"
 
 # Utilities
 uuid = { version = "1", features = ["v4"] }

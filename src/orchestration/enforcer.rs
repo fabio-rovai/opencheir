@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::store::state::StateDb;
 
 /// The action an enforcer rule produces.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Action {
     Block,
     Warn,
@@ -38,7 +38,7 @@ pub struct Rule {
 }
 
 /// The condition that determines when a rule fires.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RuleCondition {
     /// Tool X called without tool Y in the last N calls.
     MissingInWindow {
@@ -286,6 +286,73 @@ impl Enforcer {
         false
     }
 
+    /// Seed the built-in hardcoded rules into the `rules` table.
+    /// Uses INSERT OR IGNORE so existing DB customisations are preserved.
+    pub fn seed_builtins_to_db(db: &StateDb) -> anyhow::Result<()> {
+        let builtins = Enforcer::new();
+        let conn = db.conn();
+        for rule in &builtins.rules {
+            let action_str = match rule.action {
+                Action::Block => "block",
+                Action::Warn => "warn",
+                Action::Allow => "allow",
+            };
+            let condition_json = serde_json::to_string(&rule.condition)?;
+            conn.execute(
+                "INSERT OR IGNORE INTO rules (name, description, condition, action, enabled) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![
+                    rule.name,
+                    rule.description,
+                    condition_json,
+                    action_str,
+                    rule.enabled as i32,
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Replace the in-memory rule-set with everything in the `rules` table.
+    /// The sliding window (recent_calls) is left untouched.
+    pub fn reload_from_db(&mut self, db: &StateDb) -> anyhow::Result<()> {
+        let conn = db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT name, description, condition, action, enabled FROM rules",
+        )?;
+
+        let rules: Vec<Rule> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i32>(4)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .filter_map(|(name, description, condition_json, action_str, enabled)| {
+                let condition: RuleCondition = serde_json::from_str(&condition_json).ok()?;
+                let action = match action_str.as_str() {
+                    "block" => Action::Block,
+                    "warn" => Action::Warn,
+                    _ => Action::Allow,
+                };
+                Some(Rule {
+                    name,
+                    description,
+                    action,
+                    enabled: enabled != 0,
+                    condition,
+                })
+            })
+            .collect();
+
+        self.rules = rules;
+        Ok(())
+    }
+
     // -- private helpers --
 
     fn matches_condition(&self, tool_name: &str, condition: &RuleCondition) -> bool {
@@ -350,5 +417,49 @@ fn severity(action: &Action) -> u8 {
         Action::Allow => 0,
         Action::Warn => 1,
         Action::Block => 2,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::state::StateDb;
+    use tempfile::tempdir;
+
+    fn test_db() -> StateDb {
+        let dir = tempdir().unwrap();
+        StateDb::open(&dir.path().join("test.db")).unwrap()
+    }
+
+    #[test]
+    fn test_seed_and_reload() {
+        let db = test_db();
+        Enforcer::seed_builtins_to_db(&db).unwrap();
+        let mut e = Enforcer::new();
+        e.reload_from_db(&db).unwrap();
+        assert!(!e.rules().is_empty());
+        assert_eq!(
+            e.rules().iter().find(|r| r.name == "qa_after_docx_write").unwrap().enabled,
+            true
+        );
+    }
+
+    #[test]
+    fn test_condition_roundtrip() {
+        let cond = RuleCondition::MissingInWindow {
+            trigger: "write_doc".into(),
+            required: "qa_".into(),
+            window: 3,
+        };
+        let json = serde_json::to_string(&cond).unwrap();
+        let decoded: RuleCondition = serde_json::from_str(&json).unwrap();
+        match decoded {
+            RuleCondition::MissingInWindow { trigger, required, window } => {
+                assert_eq!(trigger, "write_doc");
+                assert_eq!(required, "qa_");
+                assert_eq!(window, 3);
+            }
+            _ => panic!("wrong variant"),
+        }
     }
 }

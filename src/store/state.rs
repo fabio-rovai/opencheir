@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 const MIGRATION: &str = include_str!("migrations/001_initial.sql");
 const MIGRATION_002: &str = include_str!("migrations/002_ontology_versions.sql");
+const MIGRATION_003: &str = include_str!("migrations/003_domain_locks.sql");
 
 #[derive(Clone)]
 pub struct StateDb {
@@ -33,6 +34,7 @@ impl StateDb {
 
         conn.execute_batch(&ddl)?;
         conn.execute_batch(MIGRATION_002)?;
+        conn.execute_batch(MIGRATION_003)?;
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

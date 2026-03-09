@@ -114,6 +114,24 @@ pub struct MemoryByDomainInput {
     pub domain: String,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct HiveClaimDomainInput {
+    /// Domain to lock (e.g. "ops", "research")
+    pub domain: String,
+    /// Identifier for the agent claiming the lock
+    pub locked_by: String,
+    /// Lock TTL in seconds (default 60)
+    pub ttl_seconds: Option<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct HiveReleaseDomainInput {
+    /// Domain to release
+    pub domain: String,
+    /// Token returned by hive_claim_domain
+    pub token: String,
+}
+
 // Patterns
 #[derive(Deserialize, JsonSchema)]
 pub struct PatternListInput {
@@ -485,6 +503,25 @@ impl OpenCheirServer {
         use crate::orchestration::hive::memory::MemoryService;
         match MemoryService::by_domain(&self.db, &input.domain) {
             Ok(results) => serde_json::to_string(&results).unwrap_or_default(),
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "hive_claim_domain", description = "Claim exclusive write access to a hive memory domain. Returns a token required for hive_memory_store.")]
+    async fn hive_claim_domain(&self, Parameters(input): Parameters<HiveClaimDomainInput>) -> String {
+        use crate::orchestration::hive::locks::LockService;
+        let ttl = input.ttl_seconds.unwrap_or(60);
+        match LockService::claim(&self.db, &input.domain, &input.locked_by, ttl) {
+            Ok(r) => serde_json::to_string(&r).unwrap_or_default(),
+            Err(e) => format!(r#"{{"error":"{}"}}"#, e),
+        }
+    }
+
+    #[tool(name = "hive_release_domain", description = "Release a previously claimed domain lock.")]
+    async fn hive_release_domain(&self, Parameters(input): Parameters<HiveReleaseDomainInput>) -> String {
+        use crate::orchestration::hive::locks::LockService;
+        match LockService::release(&self.db, &input.domain, &input.token) {
+            Ok(()) => r#"{"ok":true}"#.to_string(),
             Err(e) => format!(r#"{{"error":"{}"}}"#, e),
         }
     }

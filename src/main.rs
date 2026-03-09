@@ -86,8 +86,19 @@ async fn main() -> anyhow::Result<()> {
             use opencheir::orchestration::enforcer::Enforcer;
 
             let config_path = expand_tilde(&config_path);
-            let cfg = Config::load(std::path::Path::new(&config_path))
-                .unwrap_or_default();
+            let cfg = match Config::load(std::path::Path::new(&config_path)) {
+                Ok(c) => c,
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("failed to read") {
+                        // Config file doesn't exist yet — use defaults (fresh install)
+                        Config::default()
+                    } else {
+                        // Parse error — fail loudly so operators don't silently lose custom rules
+                        return Err(e);
+                    }
+                }
+            };
             let data_dir = expand_tilde(&cfg.general.data_dir);
             let db_path = std::path::Path::new(&data_dir).join("opencheir.db");
             let db = StateDb::open(&db_path)?;

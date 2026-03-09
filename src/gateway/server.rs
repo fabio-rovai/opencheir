@@ -447,7 +447,13 @@ impl OpenCheirServer {
         }
         // Update in-memory cache
         let mut enforcer = self.enforcer.lock().unwrap();
-        enforcer.set_rule_enabled(&input.rule_name, input.enabled);
+        let in_memory_updated = enforcer.set_rule_enabled(&input.rule_name, input.enabled);
+        if !in_memory_updated {
+            return format!(
+                r#"{{"ok":true,"rule":"{}","enabled":{},"warning":"rule updated in DB but not found in memory cache; restart to sync"}}"#,
+                input.rule_name, input.enabled
+            );
+        }
         format!(r#"{{"ok":true,"rule":"{}","enabled":{}}}"#, input.rule_name, input.enabled)
     }
 

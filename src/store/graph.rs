@@ -182,6 +182,59 @@ impl GraphStore {
         Ok(())
     }
 
+    pub fn load_ntriples(&self, content: &str) -> anyhow::Result<usize> {
+        let store = self.store.lock().unwrap();
+        let reader = Cursor::new(content.as_bytes());
+        let parser = RdfParser::from_format(RdfFormat::NTriples).for_reader(reader);
+        let mut count = 0;
+        for quad in parser {
+            store.insert(&quad?)?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
+    pub fn snapshot(&self, format: &str) -> anyhow::Result<String> {
+        self.serialize(format)
+    }
+
+    pub async fn fetch_url(url: &str) -> anyhow::Result<String> {
+        let resp = reqwest::get(url).await?;
+        if !resp.status().is_success() {
+            anyhow::bail!("HTTP {}: {}", resp.status(), url);
+        }
+        Ok(resp.text().await?)
+    }
+
+    pub async fn fetch_sparql(endpoint: &str, query: &str) -> anyhow::Result<String> {
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(endpoint)
+            .header("Content-Type", "application/sparql-query")
+            .header("Accept", "text/turtle")
+            .body(query.to_string())
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            anyhow::bail!("SPARQL endpoint returned HTTP {}", resp.status());
+        }
+        Ok(resp.text().await?)
+    }
+
+    pub async fn push_sparql(endpoint: &str, content: &str) -> anyhow::Result<String> {
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(endpoint)
+            .header("Content-Type", "application/sparql-update")
+            .body(format!("INSERT DATA {{ {} }}", content))
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            anyhow::bail!("SPARQL update returned HTTP {}", resp.status());
+        }
+        Ok(format!("Pushed to {}: HTTP {}", endpoint, resp.status()))
+    }
+
     fn detect_format(path: &str) -> RdfFormat {
         if path.ends_with(".ttl") || path.ends_with(".turtle") {
             RdfFormat::Turtle

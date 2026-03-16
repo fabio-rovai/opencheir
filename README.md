@@ -92,6 +92,16 @@ For ontology engineering, also add [Open Ontologies](https://github.com/fabio-ro
 }
 ```
 
+### Automatic Governance via Webhook
+
+OpenCheir starts an HTTP API on port 9900 (configurable via `OPENCHEIR_HTTP_PORT`). Point Open Ontologies at it to get automatic enforcer rule evaluation on every lineage event:
+
+```bash
+GOVERNANCE_WEBHOOK=http://localhost:9900/api/enforcer/event open-ontologies serve
+```
+
+Every `onto_save`, `onto_push`, `onto_apply`, etc. is POSTed to the enforcer, which checks rules like "warn if saved 3+ times without validating" — no Claude orchestration needed.
+
 ## Tools
 
 Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.

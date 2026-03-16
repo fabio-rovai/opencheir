@@ -167,6 +167,28 @@ async fn main() -> anyhow::Result<()> {
             // Keep watcher alive until server exits
             let _watcher = watcher;
 
+            // ── HTTP API (lineage + enforcer webhook) ─────────────────────────
+            {
+                use opencheir::orchestration::enforcer_api::{EnforcerApiState, enforcer_router};
+                use opencheir::orchestration::lineage::lineage_router;
+
+                let enforcer_state = std::sync::Arc::new(EnforcerApiState {
+                    enforcer: std::sync::Arc::clone(&enforcer),
+                    db: db.clone(),
+                });
+                let http_router = lineage_router(db.clone()).merge(enforcer_router(enforcer_state));
+                let http_port: u16 = std::env::var("OPENCHEIR_HTTP_PORT")
+                    .ok()
+                    .and_then(|p| p.parse().ok())
+                    .unwrap_or(9900);
+                let http_addr = format!("127.0.0.1:{http_port}");
+                let http_listener = tokio::net::TcpListener::bind(&http_addr).await?;
+                eprintln!("OpenCheir HTTP API on http://{http_addr}");
+                tokio::spawn(async move {
+                    axum::serve(http_listener, http_router).await.ok();
+                });
+            }
+
             let server = OpenCheirServer::new(db, enforcer, cfg.hive.lock_ttl_seconds);
             let service = server.serve(rmcp::transport::stdio()).await?;
             service.waiting().await?;

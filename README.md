@@ -1,210 +1,105 @@
 # OpenCheir
 
-Lightweight, open-source document governance MCP server written in Rust.
+Verified tender pipeline written in [Tardygrada](https://github.com/fabio-rovai/tardygrada).
 
-OpenCheir (from Greek χείρ, "hand") provides document QA, workflow enforcement, audit trails, and multi-agent orchestration as a single MCP binary.
-
-```mermaid
-flowchart TD
-    Claude["Claude"]
-    MCP["MCP Server"]
-    Enforcer["Enforcer"]
-    QA["QA"]
-    Documents["Documents"]
-    Eyes["Eyes"]
-    Hive["Hive Memory"]
-    Lineage["Lineage"]
-    StateDb["StateDb — SQLite"]
-
-    Claude --> MCP
-    MCP --> Enforcer
-    MCP --> QA
-    MCP --> Documents
-    MCP --> Eyes
-    MCP --> Hive
-    MCP --> Lineage
-    Enforcer --> StateDb
-    QA --> StateDb
-    Documents --> StateDb
-    Hive --> StateDb
-    Lineage --> StateDb
-```
-
-## Features
-
-| Module | Tools | Purpose |
-|--------|-------|---------|
-| Document QA | 5 | Font, dash, word count, signature checks |
-| Document Parsing | 2 | DOCX structure extraction |
-| Search | 1 | FTS5 full-text search |
-| Enforcer | 4 | Workflow rule engine with hot-reload |
-| Lineage | 3 | Audit trail & event tracking |
-| Patterns | 2 | Cross-session pattern discovery |
-| Memory | 3 | Persistent learning storage |
-| Hive | 2 | Domain locking for multi-agent |
-| Status | 2 | Health monitoring |
-
-> For ontology engineering (RDF/OWL/SPARQL), see [Open Ontologies](https://github.com/fabio-rovai/open-ontologies).
-
-## Requirements
-
-- Rust 1.80+
-- macOS or Linux
-
-## Install
-
-```bash
-git clone https://github.com/fabio-rovai/opencheir.git
-cd opencheir
-cargo build --release
-./target/release/opencheir init
-```
-
-## Configure Claude Code
-
-Add to `~/.claude/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "opencheir": {
-      "command": "/path/to/opencheir",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-For ontology engineering, also add [Open Ontologies](https://github.com/fabio-rovai/open-ontologies):
-
-```json
-{
-  "mcpServers": {
-    "opencheir": {
-      "command": "/path/to/opencheir",
-      "args": ["serve"]
-    },
-    "open-ontologies": {
-      "command": "/path/to/open-ontologies",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-### Automatic Governance via Webhook
-
-OpenCheir starts an HTTP API on port 9900 (configurable via `OPENCHEIR_HTTP_PORT`). Point Open Ontologies at it to get automatic enforcer rule evaluation on every lineage event:
-
-```bash
-GOVERNANCE_WEBHOOK=http://localhost:9900/api/enforcer/event open-ontologies serve
-```
-
-Every `onto_save`, `onto_push`, `onto_apply`, etc. is POSTed to the enforcer, which checks rules like "warn if saved 3+ times without validating" — no Claude orchestration needed.
-
-## Tools
-
-Tools appear as `mcp__opencheir__<tool_name>` in Claude Code.
-
-### Document QA
-
-- `qa_check_fonts` — detect font inconsistencies in DOCX
-- `qa_check_dashes` — detect dash/hyphen inconsistencies
-- `qa_check_word_counts` — check word limits vs actual
-- `qa_check_signatures` — detect unfilled signature placeholders
-- `qa_full_check` — run all QA checks at once
-
-### Document Parsing
-
-- `parse_document` — extract text, tables, structure from DOCX
-- `read_content` — read specific table cell content
-
-### Search
-
-- `search_documents` — full-text search across indexed documents
-
-### Enforcer
-
-- `enforcer_check` — check if tool call is allowed by rules
-- `enforcer_log` — view enforcement log
-- `enforcer_rules` — list all rules
-- `enforcer_toggle_rule` — enable/disable rules
-
-### Lineage
-
-- `lineage_record` — record events
-- `lineage_events` — query events
-- `lineage_timeline` — session timeline
-
-### Memory
-
-- `hive_memory_store` — store learnings
-- `hive_memory_recall` — search memory
-- `hive_memory_by_domain` — get learnings by domain
-
-### Patterns
-
-- `pattern_analyze` — discover workflow patterns
-- `pattern_list` — list discovered patterns
-
-### Status
-
-- `opencheir_status` — system health summary
-- `opencheir_health` — detailed health info
-
-## Enforcer hot-reload
-
-Enforcement rules are loaded from the `rules` table in the SQLite database on startup. Built-in rules are seeded automatically; custom rules can be added in `config.toml`:
-
-```toml
-[[enforcer.rules]]
-name = "my_rule"
-description = "Warn if writing without a prior read in last 5 calls"
-action = "warn"
-enabled = true
-
-[enforcer.rules.condition]
-type = "MissingInWindow"
-trigger = "write_document"
-required = "read_document"
-window = 5
-```
-
-While the server is running, edit and save `config.toml`. OpenCheir detects the change and reloads rules within milliseconds — no restart needed. The sliding window of recent tool calls is preserved across reloads.
-
-Toggles via `enforcer_toggle_rule` are written to the DB and survive hot-reloads.
-
-## Domain locking
-
-When two agents write to the same hive memory domain concurrently, last write wins by default. Domain locking prevents this.
-
-**Pattern:**
-
-```
-1. hive_claim_domain  →  returns { token, expires_at }
-2. hive_memory_store (with token)  →  write succeeds
-3. hive_release_domain  →  lock released
-```
-
-If another agent tries to write to a locked domain without the matching token, it receives:
-
-```json
-{"error": "domain 'ops' is locked by 'agent-1' until 2026-03-09T12:01:00"}
-```
-
-Locks expire automatically (default TTL: 60 seconds, configurable per-claim via `ttl_seconds` and globally via `[hive] lock_ttl_seconds` in `config.toml`). Locking is opt-in — unlocked domains work exactly as before.
+OpenCheir (from Greek χείρ, "hand") provides document QA, compliance checking, workflow enforcement, and end-to-end tender governance — all as verified `.tardy` agents. Every document operation goes through Tardygrada's 8-layer verification pipeline.
 
 ## Architecture
 
 ```
 opencheir/
-├── src/
-│   ├── gateway/       # MCP tool definitions & routing
-│   ├── domain/        # Document QA, image capture
-│   ├── orchestration/ # Enforcer, lineage, hive, patterns
-│   └── store/         # SQLite state, document parsing, search
-└── tests/
+├── tender.tardy              # pipeline orchestrator (25 instructions)
+├── agents/
+│   ├── parse_docx.tardy      # DOCX → structured claims via unzip
+│   ├── parse_pdf.tardy       # PDF → PageIndex tree via pdftotext
+│   ├── qa_fonts.tardy        # font consistency check
+│   ├── qa_dashes.tardy       # dash/hyphen consistency
+│   ├── qa_signatures.tardy   # unfilled signature detection
+│   ├── qa_wordcount.tardy    # word count vs limits
+│   ├── search.tardy          # FTS5 indexing and querying
+│   ├── enforcer.tardy        # workflow rule engine
+│   ├── compliance.tardy      # requirements ↔ responses matrix
+│   ├── validate.tardy        # hedging, fallacies, reading level
+│   ├── firewall.tardy        # prompt injection guard @sovereign
+│   ├── bid_analysis.tardy    # bid/no-bid scoring
+│   ├── extract_reqs.tardy    # spec → verified requirements
+│   ├── draft.tardy           # response drafting grounded in spec
+│   ├── source_verify.tardy   # quote verification
+│   └── finalize.tardy        # @sovereign lock on submission
+└── ontologies/
+    ├── document.ttl           # DOCX/PDF structure ontology
+    ├── tender.ttl             # tender domain ontology
+    └── compliance.ttl         # requirements/responses ontology
 ```
+
+## Tender Pipeline
+
+```
+1. Ingest    → parse spec PDFs and DOCX files into verified claims
+2. Extract   → pull requirements with page references
+3. Bid/no-bid → score opportunity against company capabilities
+4. Compliance → match requirements to response sections, flag gaps
+5. Draft     → write responses grounded in spec + case studies
+6. QA        → check fonts, dashes, signatures, word counts
+7. Validate  → detect hedging, fallacies, fabrication
+8. Finalize  → lock submission with @sovereign immutability
+```
+
+Every step produces verified claims. The pipeline cannot proceed with unverified data.
+
+## Requirements
+
+- [Tardygrada](https://github.com/fabio-rovai/tardygrada) (build from source)
+- System tools: `unzip`, `sqlite3`, `pdftotext` (poppler)
+
+## Install
+
+```bash
+# Build Tardygrada
+git clone https://github.com/fabio-rovai/tardygrada.git
+cd tardygrada && make
+
+# Clone OpenCheir
+git clone https://github.com/fabio-rovai/opencheir.git
+```
+
+## Usage
+
+```bash
+# Check all agents compile
+for f in agents/*.tardy; do tardygrada check "$f"; done
+
+# Run the full pipeline
+tardygrada serve tender.tardy
+
+# Run individual agents
+tardygrada run agents/qa_fonts.tardy
+tardygrada run agents/compliance.tardy
+```
+
+## Verification Guarantees
+
+Every agent runs inside Tardygrada's verification pipeline:
+
+| Agent | Trust Level | What's Verified |
+|-------|-------------|-----------------|
+| `firewall.tardy` | `@sovereign` | Cannot be bypassed — BFT + ed25519 signed |
+| `finalize.tardy` | `@sovereign` | Submission locked — cryptographically immutable |
+| `enforcer.tardy` | `@sovereign` | Workflow rules cannot be skipped |
+| All QA agents | `@verified` | SHA-256 checked — results are tamper-proof |
+| All analysis agents | `@verified` | Claims grounded in ontology + evidence |
+
+## Ontologies
+
+| Ontology | Classes | Purpose |
+|----------|---------|---------|
+| `document.ttl` | Document, Section, Paragraph, Table, Run, Font, TocEntry | DOCX/PDF structure |
+| `tender.ttl` | Tender, Specification, Requirement, Lot, CaseStudy, StaffMember, PricingSchedule | Tender domain |
+| `compliance.ttl` | ComplianceMatch, CoverageStatus, Evidence, Gap, Quote | Requirements mapping |
+
+## History
+
+OpenCheir v1 was a Rust MCP server (see git history). v2 is a complete rewrite in Tardygrada's `.tardy` language — replacing ~5,000 lines of Rust with 17 verified agents totalling ~160 instructions.
 
 ## License
 

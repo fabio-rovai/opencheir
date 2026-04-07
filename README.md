@@ -1,18 +1,4 @@
-# OpenCheir (Archived)
-
-> **This project has been superseded by [OpenCheir v2](https://github.com/fabio-rovai/tardygrada/tree/main/examples/opencheir) — a pure `.tardy` implementation inside [Tardygrada](https://github.com/fabio-rovai/tardygrada).**
->
-> The v2 rewrite replaces this Rust MCP server with 17 verified `.tardy` agents + 3 OWL ontologies. Every document operation goes through Tardygrada's 8-layer verification pipeline. No Rust, no Python, no sidecars — just `.tardy` files and system tools (`unzip`, `sqlite3`, `pdftotext`).
->
-> This repository is archived for reference. No further updates will be made here.
-
----
-
-*Original README below for historical reference.*
-
----
-
-# OpenCheir (v1 — Rust)
+# OpenCheir
 
 Lightweight, open-source document governance MCP server written in Rust.
 
